@@ -1,0 +1,99 @@
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    @apply font-sans bg-gray-50 text-gray-900;
+    user-select: none;
+  }
+
+  .dark body {
+    @apply bg-dark-bg text-slate-100;
+  }
+
+  /* 스크롤바 */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-dark-muted;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-dark-muted;
+  }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
+
+  /* 결과 테이블 전용 스크롤바 (크고 컬러풀) */
+  .scrollbar-thick::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scrollbar-thick::-webkit-scrollbar-track { background: transparent; border-radius: 9999px; }
+  .scrollbar-thick::-webkit-scrollbar-thumb {
+    background: #6366f1;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-thick::-webkit-scrollbar-thumb:hover { background: #818cf8; background-clip: content-box; border: 2px solid transparent; }
+  .scrollbar-thick::-webkit-scrollbar-corner { background: transparent; }
+
+  /* 텍스트 선택 허용 영역 */
+  input, textarea, select, p, span, td, th {
+    user-select: text;
+  }
+}
+
+@layer components {
+  /* 다크 모드 body 스타일 재설정 */
+  .dark body,
+  .dark {
+    background-color: #0A0F1E;
+    color: #F1F5F9;
+  }
+}
+
+/* ── 라이트 모드: 딸기 테마 ─────────────────────────────────────────── */
+:root:not(.dark) body {
+  background-color: #FFF5F6 !important;
+  color: #3D0A14;
+}
+
+/* 페이지·섹션 배경 */
+:root:not(.dark) .bg-gray-50   { background-color: #FFF5F6 !important; }
+:root:not(.dark) .bg-gray-100  { background-color: #FFECEE !important; }
+
+/* 카드·서피스 */
+:root:not(.dark) .bg-white     { background-color: #FFF8F9 !important; }
+
+/* 보더 */
+:root:not(.dark) .border-gray-200 { border-color: #FCCFD2 !important; }
+:root:not(.dark) .border-gray-100 { border-color: #FDDEE0 !important; }
+
+/* 텍스트 — 딸기 계열 + 충분한 대비 */
+:root:not(.dark) .text-gray-900 { color: #1A0408 !important; }
+:root:not(.dark) .text-gray-800 { color: #3D0A14 !important; }
+:root:not(.dark) .text-gray-700 { color: #5C1523 !important; }
+:root:not(.dark) .text-gray-600 { color: #7B2232 !important; }
+:root:not(.dark) .text-gray-500 { color: #8B3A45 !important; }
+:root:not(.dark) .text-gray-400 { color: #A85060 !important; }
+
+/* 사이드바·입력·버튼 hover */
+:root:not(.dark) .hover\:bg-gray-100:hover  { background-color: #FFDFE2 !important; }
+:root:not(.dark) .hover\:bg-gray-200:hover  { background-color: #FFCDD1 !important; }
+
+/* select / input 배경 */
+:root:not(.dark) .bg-gray-50\/60 { background-color: rgba(255,245,246,0.6) !important; }
