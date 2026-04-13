@@ -7,9 +7,10 @@ interface Props {
   rows:      ExcelRow[]
   fileName?: string
   disabled?: boolean
+  label?:    string
 }
 
-export function DownloadButton({ rows, fileName, disabled }: Props) {
+export function DownloadButton({ rows, fileName, disabled, label }: Props) {
   const [loading, setLoading] = useState(false)
 
   const handleDownload = async () => {
@@ -44,7 +45,7 @@ export function DownloadButton({ rows, fileName, disabled }: Props) {
         ? <Loader2 size={16} className="animate-spin" />
         : <Download size={16} />
       }
-      {loading ? '다운로드 중...' : 'B2B 엑셀파일 다운로드'}
+      {loading ? '다운로드 중...' : (label ?? 'B2B 엑셀파일 다운로드')}
     </button>
   )
 }

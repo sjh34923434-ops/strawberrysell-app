@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
@@ -11,15 +11,6 @@ export function LoginPage() {
   const [password,   setPassword]   = useState('')
   const [showPw,     setShowPw]     = useState(false)
   const [autoLogin,  setAutoLogin]  = useState(true)
-
-  // DEV 자동 로그인
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const devEmail = import.meta.env.VITE_DEV_EMAIL
-    const devPw    = import.meta.env.VITE_DEV_PASSWORD
-    if (!devEmail || !devPw) return
-    login(devEmail, devPw).then(() => navigate('/dashboard')).catch(() => {})
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

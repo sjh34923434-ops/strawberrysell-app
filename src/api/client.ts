@@ -168,6 +168,18 @@ export const licenseApi = {
 // ─── 쿠팡 API ─────────────────────────────────────────────────────────────────
 
 export const coupangApi = {
+  getOrders: async (bizId: string, connId: string, startDate: string, endDate: string, status: string) => {
+    try {
+      const { data } = await api.get<{ orders: any[]; total: number }>(
+        `/businesses/${bizId}/connections/${connId}/coupang/orders`,
+        { params: { startDate, endDate, status } }
+      )
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
   confirmShipments: async (
     bizId: string,
     connId: string,
