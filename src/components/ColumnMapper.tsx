@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo } from 'react'
 import { ArrowRight, Wand2, CheckCircle2, Save, Trash2, BookOpen, X, PlusCircle } from 'lucide-react'
-import { autoMatchColumns, type ColumnMapping } from '../utils/fillMapper'
+import { autoMatchColumns, SEPARATE_DELIVERY_PATTERN, type ColumnMapping } from '../utils/fillMapper'
 import { useSettingsStore } from '../stores/settingsStore'
 
 // 드롭다운 상단에 우선 표시할 주문 컬럼 순서
@@ -116,10 +116,12 @@ export function ColumnMapper({
       const next = new Set(prev)
       if (next.has(b2bCol)) {
         next.delete(b2bCol)
-        // 접을 때 값도 지움
-        const newAppend = { ...appendValues }
-        delete newAppend[b2bCol]
-        onAppendValuesChange(newAppend)
+        // 값이 비어있을 때만 삭제 (값이 있으면 유지)
+        if (!(appendValues[b2bCol] ?? '').trim()) {
+          const newAppend = { ...appendValues }
+          delete newAppend[b2bCol]
+          onAppendValuesChange(newAppend)
+        }
       } else {
         next.add(b2bCol)
         if (!(b2bCol in appendValues)) {
@@ -139,7 +141,9 @@ export function ColumnMapper({
   }
 
   const cleanAppendValues = () =>
-    Object.fromEntries(Object.entries(appendValues).filter(([, v]) => v.trim() !== ''))
+    Object.fromEntries(Object.entries(appendValues).filter(([k, v]) =>
+      v.trim() !== '' || SEPARATE_DELIVERY_PATTERN.test(k)  // 분리배송 컬럼은 '' 도 저장 (해제 상태 유지)
+    ))
 
   const handleSave = () => {
     const cleanAppend = cleanAppendValues()
@@ -248,8 +252,9 @@ export function ColumnMapper({
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-200 dark:text-slate-200 text-gray-800">
+          <p className="text-sm font-medium text-slate-200 dark:text-slate-200 text-gray-800 flex items-center gap-2">
             컬럼 매핑
+            <span style={{ fontSize: '1.1em' }} className="text-red-400 font-semibold">(제목줄 이름)</span>
           </p>
           <p className="text-xs text-slate-500 mt-0.5">
             {mode === 'invoice'
@@ -269,7 +274,7 @@ export function ColumnMapper({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20 hover:bg-primary-500/20 active:scale-95 transition-all"
           >
             <Wand2 size={12} />
-            자동 매칭
+            자동<br />매칭
           </button>
           <button
             onClick={handleOpenSaveModal}
@@ -384,13 +389,15 @@ export function ColumnMapper({
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10 bg-dark-surface dark:bg-dark-surface bg-gray-50">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-sky-400/80 border-b border-dark-border dark:border-dark-border border-gray-200 w-[36%]">
-                  {mode === 'invoice' ? '마켓 업로드 양식 컬럼' : 'B2B 컬럼 (도매처)'}
+                <th className="px-4 py-2.5 text-left border-b border-dark-border dark:border-dark-border border-gray-200 w-[36%]">
+                  <span style={{ fontSize: '1.1em' }} className="font-medium text-sky-400/80">
+                    {mode === 'invoice' ? '마켓 업로드 양식 컬럼' : 'B2B 컬럼 (도매처)'}
+                  </span>
                 </th>
                 <th className="px-1 py-2.5 text-center border-b border-dark-border dark:border-dark-border border-gray-200 w-[5%]" />
                 <th className="px-3 py-2.5 text-left border-b border-dark-border dark:border-dark-border border-gray-200 w-[37%]">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-amber-400/80">
+                    <span style={{ fontSize: '1.1em' }} className="font-medium text-amber-400/80">
                       {mode === 'invoice' ? 'B2B 송장 컬럼' : '마켓 주문 컬럼'}
                     </span>
                     <button
@@ -399,10 +406,11 @@ export function ColumnMapper({
                         b2bHeaders.forEach(col => { cleared[col] = null })
                         onMappingChange(cleared)
                       }}
-                      className="text-[12px] text-slate-500 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded border border-slate-700 hover:border-red-500/40"
+                      style={{ fontSize: '0.8em' }}
+                      className="text-slate-500 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded border border-slate-700 hover:border-red-500/40"
                       title="모든 컬럼을 비워두기로 초기화"
                     >
-                      비워두기 모두적용
+                      비워두기<br />모두적용
                     </button>
                   </div>
                 </th>
@@ -443,6 +451,26 @@ export function ColumnMapper({
                       <span className={`text-xs font-mono ${isMapped ? 'text-sky-300 dark:text-sky-300 text-sky-700' : 'text-slate-400'}`}>
                         {b2bCol}
                       </span>
+                      {b2bCol === '분리배송 Y/N' && (
+                        <button
+                          onClick={() => {
+                            const next = appendVal === 'N' ? '' : 'N'
+                            handleAppendChange(b2bCol, next)
+                            setExpandedAppend((prev) => {
+                              const s = new Set(prev)
+                              if (next) s.add(b2bCol); else s.delete(b2bCol)
+                              return s
+                            })
+                          }}
+                          className={`text-[10px] mt-0.5 transition-colors ${
+                            appendVal === 'N'
+                              ? 'text-emerald-400/80 hover:text-red-400'
+                              : 'text-slate-500 hover:text-emerald-400'
+                          }`}
+                        >
+                          {appendVal === 'N' ? '✓ N 고정값 자동적용 (클릭시 해제)' : '✕ N 고정값 해제됨 (클릭시 재적용)'}
+                        </button>
+                      )}
                     </td>
 
                     {/* 화살표 */}

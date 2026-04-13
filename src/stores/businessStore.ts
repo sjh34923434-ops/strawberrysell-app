@@ -48,10 +48,6 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
   error:      null,
 
   fetch: async () => {
-    if (import.meta.env.DEV) {
-      set({ isLoading: false, error: null })
-      return
-    }
     set({ isLoading: true, error: null })
     try {
       const { data } = await api.get<Business[]>('/businesses')

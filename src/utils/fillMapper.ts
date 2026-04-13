@@ -7,7 +7,7 @@ export type ColumnMapping = Record<string, string | null>;
 export const ROW_NUMBER_KEY = '__ROW_NUMBER__';
 
 /** 분리배송 Y/N 컬럼명 패턴 (출고예정일 등 제외) */
-const SEPARATE_DELIVERY_PATTERN = /분리배송.*[YyNn\/]|분리배송\s*Y/;
+export const SEPARATE_DELIVERY_PATTERN = /분리배송.*[YyNn\/]|분리배송\s*Y/;
 
 export interface FillResult {
   rows: ExcelRow[];
@@ -45,10 +45,11 @@ export function fillB2bFromOrder(
       const orderVal  = orderCol === ROW_NUMBER_KEY
         ? String(rowIndex + 1)
         : orderCol != null ? String(orderRow[orderCol] ?? '') : ''
-      // 분리배송 컬럼: 매핑 없으면 자동으로 'N' 고정
-      const appendVal = appendValues[b2bCol] ?? ''
-      const isUnmapped = !orderCol && !appendVal
-      b2bRow[b2bCol]  = isUnmapped && SEPARATE_DELIVERY_PATTERN.test(b2bCol)
+      // 분리배송 컬럼: 키가 없으면 기본 'N', 키가 존재하면 그 값 사용 (''이면 비워두기)
+      const appendVal       = appendValues[b2bCol] ?? ''
+      const hasExplicitKey  = b2bCol in appendValues
+      const isUnmapped      = !orderCol && !appendVal
+      b2bRow[b2bCol] = isUnmapped && !hasExplicitKey && SEPARATE_DELIVERY_PATTERN.test(b2bCol)
         ? 'N'
         : orderVal + appendVal
     }

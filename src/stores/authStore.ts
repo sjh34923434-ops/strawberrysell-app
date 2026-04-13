@@ -45,22 +45,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     if (!useAuthStore.getState().isAuthenticated) return
     set({ user: null, isAuthenticated: false })
-    if (!import.meta.env.DEV) {
-      await authApi.logout()
-      await window.electron.store.delete('refreshToken')
-    }
+    await authApi.logout()
+    await window.electron.store.delete('refreshToken')
   },
 
   checkAuth: async () => {
-    // 개발 환경: API 호출 없이 가짜 사용자로 즉시 인증 통과
-    if (import.meta.env.DEV) {
-      set({
-        user: { id: 'dev', email: 'admin@strawberrysell.com', isAdmin: true, status: 'active' },
-        isAuthenticated: true,
-        isLoading: false,
-      })
-      return
-    }
     set({ isLoading: true })
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), 5000)
@@ -105,7 +94,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 }))
 
 // 전역 인증 만료 이벤트 구독 (HMR 중복 방지)
-if (typeof window !== 'undefined' && !import.meta.env.DEV) {
+if (typeof window !== 'undefined') {
   if (!(window as any).__authListenerAdded) {
     ;(window as any).__authListenerAdded = true
     window.addEventListener('auth:unauthorized', () => {

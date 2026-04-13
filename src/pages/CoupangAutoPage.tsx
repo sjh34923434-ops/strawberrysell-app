@@ -348,7 +348,7 @@ export function CoupangAutoPage() {
             </button>
 
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/dashboard')}
               className="w-full py-2.5 rounded-xl text-sm font-medium bg-dark-hover dark:bg-dark-hover bg-gray-100 border border-dark-border dark:border-dark-border border-gray-200 text-slate-300 dark:text-slate-300 text-gray-700 hover:bg-dark-muted transition-all"
             >
               ← 뒤로가기
