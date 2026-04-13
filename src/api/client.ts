@@ -16,16 +16,47 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// 401 → 전역 이벤트로 인증 만료 알림 (logout/refresh 엔드포인트는 제외)
+// 401 → refreshToken으로 재시도, 실패 시 전역 로그아웃 이벤트
+let isRefreshing = false
+let pendingQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = []
+
 api.interceptors.response.use(
   (res) => res,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const url = error.config?.url ?? ''
     const isAuthEndpoint = url.includes('/auth/logout') || url.includes('/auth/refresh') || url.includes('/auth/login')
-    if (error.response?.status === 401 && !isAuthEndpoint) {
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+    if (error.response?.status !== 401 || isAuthEndpoint) return Promise.reject(error)
+
+    const originalConfig = error.config!
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        pendingQueue.push({ resolve, reject })
+      }).then((token) => {
+        originalConfig.headers!.Authorization = `Bearer ${token}`
+        return api(originalConfig)
+      })
     }
-    return Promise.reject(error)
+
+    isRefreshing = true
+    try {
+      const stored = await window.electron?.store?.get('refreshToken') as string | undefined
+      if (!stored) throw new Error('no token')
+      const { data } = await api.post<{ accessToken: string; refreshToken: string }>('/auth/refresh', { refreshToken: stored })
+      sessionStorage.setItem('accessToken', data.accessToken)
+      await window.electron?.store?.set('refreshToken', data.refreshToken)
+      pendingQueue.forEach(p => p.resolve(data.accessToken))
+      pendingQueue = []
+      originalConfig.headers!.Authorization = `Bearer ${data.accessToken}`
+      return api(originalConfig)
+    } catch {
+      pendingQueue.forEach(p => p.reject(error))
+      pendingQueue = []
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+      return Promise.reject(error)
+    } finally {
+      isRefreshing = false
+    }
   }
 )
 
@@ -127,6 +158,26 @@ export const licenseApi = {
         valid:     boolean
         expiresAt: string
       }>('/license/verify', { licenseKey, macAddress })
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+}
+
+// ─── 쿠팡 API ─────────────────────────────────────────────────────────────────
+
+export const coupangApi = {
+  confirmShipments: async (
+    bizId: string,
+    connId: string,
+    shipments: { shipmentBoxId: string; deliveryCompanyCode: string; invoiceNumber: string }[]
+  ) => {
+    try {
+      const { data } = await api.post<{ code: string; message: string; data?: unknown }>(
+        `/businesses/${bizId}/connections/${connId}/coupang/shipments`,
+        shipments
+      )
       return data
     } catch (err) {
       throw new Error(parseError(err))

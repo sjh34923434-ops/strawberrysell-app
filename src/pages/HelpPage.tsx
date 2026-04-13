@@ -4,6 +4,7 @@ import {
   GitMerge, Layers, Save, Download, Settings2,
   FileSpreadsheet, CheckCircle2, SplitSquareHorizontal,
   PlusCircle, FolderOpen, Repeat, Truck, Package,
+  Building2, ShoppingCart, Key, RefreshCw,
 } from 'lucide-react'
 
 // ─── 공통 컴포넌트 ─────────────────────────────────────────────────────────────
@@ -536,6 +537,153 @@ function TextGuideSection() {
   )
 }
 
+// ─── 섹션 6: 사업자 관리 ──────────────────────────────────────────────────────
+
+function BusinessSection() {
+  return (
+    <SectionWrap title="🏢 사업자 관리">
+      <div className="mt-5 space-y-4">
+        <p className="text-xs text-slate-400">쿠팡·스마트스토어 등 마켓 API 연동을 위해 사업자를 먼저 등록해야 합니다.</p>
+
+        {/* 등록 순서 */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">등록 순서</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { icon: Building2, label: '사업자 추가', color: 'text-primary-400', sub: '이름 입력' },
+              { icon: Key, label: 'API 키 입력', color: 'text-amber-400', sub: '액세스·시크릿 키' },
+              { icon: CheckCircle2, label: '연동 완료', color: 'text-emerald-400', sub: '쿠팡 자동매칭 사용 가능' },
+            ].map((item, i, arr) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border border-dark-border bg-dark-hover text-center min-w-[90px]">
+                  <item.icon size={16} className={item.color} />
+                  <p className="text-xs font-semibold text-slate-300">{item.label}</p>
+                  <p className="text-[10px] text-slate-500">{item.sub}</p>
+                </div>
+                {i < arr.length - 1 && <ArrowRight size={14} className="text-slate-600 shrink-0" />}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 안내 */}
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-amber-400">쿠팡 API 키 발급 안내</p>
+          <p className="text-xs text-slate-400">쿠팡 Wing → 판매자 정보 → Open API 신청에서 액세스 키와 시크릿 키를 발급받으세요.</p>
+          <p className="text-xs text-slate-400">승인까지 보통 1영업일 소요됩니다. 승인 후 쿠팡 자동매칭 기능이 활성화됩니다.</p>
+        </div>
+
+        {/* 마켓별 지원 현황 */}
+        <div className="rounded-xl border border-dark-border bg-dark-hover/30 p-4">
+          <p className="text-xs font-semibold text-slate-400 mb-3">마켓별 API 연동 현황</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { name: '쿠팡', status: '연동 지원', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+              { name: '스마트스토어', status: '준비 중', color: 'text-slate-500 bg-dark-hover border-dark-border' },
+              { name: '11번가', status: '준비 중', color: 'text-slate-500 bg-dark-hover border-dark-border' },
+              { name: '옥션/지마켓', status: '준비 중', color: 'text-slate-500 bg-dark-hover border-dark-border' },
+            ].map(m => (
+              <div key={m.name} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs ${m.color}`}>
+                <span className="font-medium text-slate-300">{m.name}</span>
+                <span>{m.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SectionWrap>
+  )
+}
+
+// ─── 섹션 7: 쿠팡 자동매칭 ────────────────────────────────────────────────────
+
+function CoupangAutoSection() {
+  return (
+    <SectionWrap title="🛒 쿠팡 자동매칭">
+      <div className="mt-5 space-y-4">
+
+        <p className="text-xs text-slate-400">
+          쿠팡 API로 주문을 직접 가져와 거래처별로 자동 분류·출력하는 기능입니다.
+          주문 엑셀을 수동으로 다운로드할 필요 없이 API로 바로 가져옵니다.
+        </p>
+
+        {/* 3단계 흐름 */}
+        <div className="space-y-2">
+          {[
+            {
+              num: 1, label: '주문 가져오기', icon: RefreshCw, color: 'border-orange-500/30 bg-orange-500/5',
+              iconColor: 'text-orange-400',
+              desc: '사업자 선택 → 주문 상태 필터 선택 → 주문 가져오기 클릭\n가져온 주문 건수 확인 후 다음 단계로 이동',
+            },
+            {
+              num: 2, label: '파트너 설정 (컬럼 매핑)', icon: Settings2, color: 'border-amber-500/30 bg-amber-500/5',
+              iconColor: 'text-amber-400',
+              desc: 'B2B 양식 파일 업로드 → 쿠팡 주문 컬럼 ↔ B2B 컬럼 매핑\n자동 매핑 버튼으로 빠르게 연결, 저장해두면 다음번엔 1클릭',
+            },
+            {
+              num: 3, label: '결과 다운로드', icon: Download, color: 'border-emerald-500/30 bg-emerald-500/5',
+              iconColor: 'text-emerald-400',
+              desc: '거래처별 B2B 파일 개별 다운로드 또는 전체 ZIP 한번에 다운로드\n미매칭 주문 별도 확인 가능',
+            },
+          ].map((s, i) => (
+            <div key={s.num}>
+              <div className={`flex items-start gap-4 p-4 rounded-xl border ${s.color}`}>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-dark-hover text-xs font-bold text-slate-400">{s.num}</div>
+                  <s.icon size={20} className={s.iconColor} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-200 mb-1">{s.label}</p>
+                  {s.desc.split('\n').map((line, j) => (
+                    <p key={j} className="text-xs text-slate-400 leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              </div>
+              {i < 2 && <Arrow vertical />}
+            </div>
+          ))}
+        </div>
+
+        {/* 사전 조건 */}
+        <div className="rounded-xl bg-primary-500/5 border border-primary-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-primary-400">사용 전 필수 조건</p>
+          <div className="space-y-1">
+            {[
+              '사업자 관리에서 쿠팡 사업자 등록 및 API 키 입력',
+              '쿠팡 Wing에서 Open API 승인 완료 (1영업일)',
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-slate-400">
+                <CheckCircle2 size={11} className="text-primary-400 shrink-0" />
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 주문 상태 안내 */}
+        <div className="rounded-xl border border-dark-border bg-dark-hover/30 p-4">
+          <p className="text-xs font-semibold text-slate-400 mb-3">주문 상태 필터</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: '전체', desc: '모든 주문' },
+              { label: '결제완료', desc: 'ACCEPT' },
+              { label: '상품준비중', desc: 'INSTRUCT' },
+              { label: '배송준비중', desc: 'DEPARTURE' },
+              { label: '배송중', desc: 'DELIVERING' },
+            ].map(s => (
+              <div key={s.label} className="px-2.5 py-1.5 rounded-lg bg-dark-card border border-dark-border text-center">
+                <p className="text-xs font-medium text-slate-300">{s.label}</p>
+                <p className="text-[10px] text-slate-600">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </SectionWrap>
+  )
+}
+
 // ─── 메인 ──────────────────────────────────────────────────────────────────────
 
 export function HelpPage() {
@@ -560,6 +708,8 @@ export function HelpPage() {
         </div>
 
         <FullFlowSection />
+        <BusinessSection />
+        <CoupangAutoSection />
         <CompareSection />
         <MatchingFlowSection />
         <MultiMatchFlowSection />

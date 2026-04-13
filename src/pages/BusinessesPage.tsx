@@ -20,6 +20,7 @@ function SortableConnCard({
   isOpen,
   saved,
   status,
+  testError,
   connEdit,
   savingConn,
   onExpand,
@@ -34,6 +35,7 @@ function SortableConnCard({
   isOpen:       boolean
   saved:        'ok' | 'fail' | undefined
   status:       TestStatus
+  testError:    string | undefined
   connEdit:     ConnEdit
   savingConn:   boolean
   onExpand:     () => void
@@ -88,10 +90,15 @@ function SortableConnCard({
               <Wifi size={12} /> 연결됨
             </button>
           ) : status === 'fail' ? (
-            <button onClick={onTest}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-all">
-              <WifiOff size={12} /> 안됨 (재시도)
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button onClick={onTest}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-all">
+                <WifiOff size={12} /> 안됨 (재시도)
+              </button>
+              {testError && (
+                <span className="text-[10px] text-red-400/80 max-w-[180px] text-right leading-tight">{testError}</span>
+              )}
+            </div>
           ) : (
             <button onClick={onTest}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20 hover:bg-primary-500/20 transition-all">
@@ -194,6 +201,7 @@ export function BusinessesPage() {
   const [showAddBiz,    setShowAddBiz]    = useState(false)
   const [showAddConn,   setShowAddConn]   = useState(false)
   const [testStatus,    setTestStatus]    = useState<Record<string, TestStatus>>({})
+  const [testError,     setTestError]     = useState<Record<string, string>>({})
   const [editingBizId,  setEditingBizId]  = useState<string | null>(null)
   const [editName,      setEditName]      = useState('')
   const [expandedConn,  setExpandedConn]  = useState<string | null>(null)
@@ -281,11 +289,16 @@ export function BusinessesPage() {
   const handleTest = async (connId: string) => {
     if (!activeId) return
     setTestStatus(s => ({ ...s, [connId]: 'testing' }))
+    setTestError(s => { const n = { ...s }; delete n[connId]; return n })
     try {
       const res = await testConnection(activeId, connId)
       setTestStatus(s => ({ ...s, [connId]: res.ok ? 'ok' : 'fail' }))
-    } catch {
+      if (!res.ok && res.message) {
+        setTestError(s => ({ ...s, [connId]: res.message }))
+      }
+    } catch (err: any) {
       setTestStatus(s => ({ ...s, [connId]: 'fail' }))
+      setTestError(s => ({ ...s, [connId]: err?.message ?? '알 수 없는 오류' }))
     }
   }
 
@@ -430,6 +443,7 @@ export function BusinessesPage() {
                         isOpen={expandedConn === conn.id}
                         saved={saveResult[conn.id]}
                         status={testStatus[conn.id] ?? 'idle'}
+                        testError={testError[conn.id]}
                         connEdit={connEdit}
                         savingConn={savingConn}
                         onExpand={() => handleExpandConn(conn)}
