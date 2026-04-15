@@ -19,6 +19,7 @@ import { SettingsPage }    from './pages/SettingsPage'
 import { HelpPage }        from './pages/HelpPage'
 import { AdminPage }       from './pages/AdminPage'
 import { BusinessesPage }  from './pages/BusinessesPage'
+import { B2bPartnersPage } from './pages/B2bPartnersPage'
 
 // ─── 인증 보호 레이아웃 ────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ function AppLayout() {
           <Route path="/help"         element={<HelpPage />} />
           <Route path="/admin"        element={<AdminPage />} />
           <Route path="/businesses"   element={<BusinessesPage />} />
+          <Route path="/b2b-partners" element={<B2bPartnersPage />} />
           <Route path="*"             element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

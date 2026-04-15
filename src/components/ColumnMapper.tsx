@@ -1,7 +1,18 @@
 import { useCallback, useState, useMemo } from 'react'
-import { ArrowRight, Wand2, CheckCircle2, Save, Trash2, BookOpen, X, PlusCircle } from 'lucide-react'
+import { ArrowRight, Wand2, CheckCircle2, Save, Trash2, BookOpen, X, PlusCircle, KeyRound } from 'lucide-react'
 import { autoMatchColumns, SEPARATE_DELIVERY_PATTERN, type ColumnMapping } from '../utils/fillMapper'
 import { useSettingsStore } from '../stores/settingsStore'
+
+/**
+ * 주문 고유 식별 복합 키 컬럼
+ * 주문번호 + 수취인이름 + 연락처 + 주소 → 동명이인·중복배송 방지
+ */
+const ORDER_IDENTITY_COLUMNS = new Set([
+  '주문번호',
+  '수취인이름',
+  '수취인전화번호',
+  '수취인주소',
+])
 
 // 드롭다운 상단에 우선 표시할 주문 컬럼 순서
 const PREFERRED_ORDER = [
@@ -58,6 +69,7 @@ interface Props {
   mode?:               'order' | 'invoice'
   onMappingChange:     (mapping: ColumnMapping) => void
   onAppendValuesChange:(appendValues: Record<string, string>) => void
+  onPresetLoaded?:     (id: string | null) => void  // 프리셋 적용 시 ID 콜백
 }
 
 export function ColumnMapper({
@@ -71,6 +83,7 @@ export function ColumnMapper({
   mode = 'order',
   onMappingChange,
   onAppendValuesChange,
+  onPresetLoaded,
 }: Props) {
   const [autoResult, setAutoResult]     = useState<number | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -86,17 +99,18 @@ export function ColumnMapper({
   const { mappingPresets, savePreset, deletePreset, replacePreset } = useSettingsStore()
   const sortedOrderHeaders = useMemo(() => sortOrderHeaders(orderHeaders), [orderHeaders])
 
-  // 송장번호 탭 핵심 컬럼 감지
-  const INVOICE_CORE_PATTERNS = [/^번호$/, /주문번호/, /택배사/, /운송장번호/, /분리배송.*[Yy\/]/, /옵션.?id/i]
-  const isCoreCol = (col: string) => INVOICE_CORE_PATTERNS.some((p) => p.test(col))
+  // 핵심 컬럼 감지 패턴 (송장 탭 + 주문 탭 공통)
+  const CORE_PATTERNS = [
+    /^번호$/, /주문번호/, /택배사/, /운송장번호/, /분리배송.*[Yy\/]/, /옵션.?id/i,
+    /묶음배송/, /노출상품.*id/i, /업체상품코드/, /수취인이름|수취인명/, /수취인전화/, /수취인주소/,
+  ]
+  const isCoreCol = (col: string) => CORE_PATTERNS.some((p) => p.test(col))
   const coreHeaders    = b2bHeaders.filter(isCoreCol)
   const nonCoreHeaders = b2bHeaders.filter((c) => !isCoreCol(c))
   // coreOnly ON이면 핵심만, 아니면 핵심 → 나머지 순서로
-  const displayHeaders = mode === 'invoice' && coreOnly
+  const displayHeaders = coreOnly
     ? coreHeaders
-    : mode === 'invoice'
-      ? [...coreHeaders, ...nonCoreHeaders]
-      : b2bHeaders
+    : [...coreHeaders, ...nonCoreHeaders]
 
   const mappedCount = b2bHeaders.filter((col) => {
     return !!(mapping[col]) || !!(appendValues[col] ?? '').trim()
@@ -162,11 +176,12 @@ export function ColumnMapper({
     setShowSaveModal(true)
   }
 
-  const handleApplyPreset = (presetMapping: ColumnMapping, presetAppend?: Record<string, string>) => {
+  const handleApplyPreset = (presetId: string, presetMapping: ColumnMapping, presetAppend?: Record<string, string>) => {
     onMappingChange(presetMapping)
     const av = presetAppend ?? {}
     onAppendValuesChange(av)
     setExpandedAppend(new Set(Object.keys(av).filter((k) => av[k] !== '')))
+    onPresetLoaded?.(presetId)
     setShowPresets(false)
   }
 
@@ -312,7 +327,7 @@ export function ColumnMapper({
                 className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 hover:border-amber-500/30 transition-colors group"
               >
                 <button
-                  onClick={() => handleApplyPreset(preset.mapping, preset.appendValues)}
+                  onClick={() => handleApplyPreset(preset.id, preset.mapping, preset.appendValues)}
                   className="flex-1 text-center"
                 >
                   <div className="flex items-center justify-center gap-2">
@@ -359,6 +374,40 @@ export function ColumnMapper({
         )}
       </div>
 
+      {/* 🔑 식별 키 컬럼 매핑 현황 */}
+      {mode === 'order' && (() => {
+        const identityMapped = [...ORDER_IDENTITY_COLUMNS].filter(
+          col => Object.values(mapping).includes(col) || orderHeaders.includes(col) && mapping[
+            b2bHeaders.find(h => mapping[h] === col) ?? ''
+          ]
+        )
+        const mappedIdentityValues = new Set(
+          b2bHeaders.map(h => mapping[h]).filter(v => v && ORDER_IDENTITY_COLUMNS.has(v as string))
+        )
+        const allMapped = mappedIdentityValues.size === ORDER_IDENTITY_COLUMNS.size
+        return (
+          <div className={`px-3 py-2 rounded-lg border text-xs flex items-start gap-2
+            ${allMapped
+              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400/80'
+              : 'bg-amber-500/5 border-amber-500/20 text-amber-400/80'}`}>
+            <KeyRound size={12} className="mt-0.5 shrink-0" />
+            <div>
+              <span className="font-medium">주문 식별 키 컬럼</span>
+              {' '}(동명이인·중복 배송 방지):
+              {' '}
+              {[...ORDER_IDENTITY_COLUMNS].map(col => (
+                <span key={col} className={`inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded text-[11px] border
+                  ${mappedIdentityValues.has(col)
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-slate-500/10 border-slate-500/30 text-slate-500'}`}>
+                  {mappedIdentityValues.has(col) ? '✓' : '–'} {col}
+                </span>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* 추가 텍스트 안내 */}
       <div className="px-3 py-2 rounded-lg bg-sky-500/5 border border-sky-500/15 text-xs text-sky-400/80">
         <span className="font-medium">추가 텍스트</span>란? 주문 데이터 뒤에 덧붙일 글자입니다.
@@ -368,8 +417,8 @@ export function ColumnMapper({
 
       {/* 매핑 테이블 */}
       <div className="rounded-xl border border-dark-border dark:border-dark-border border-gray-200 overflow-hidden">
-        {/* 송장번호 탭: 핵심 컬럼 토글 */}
-        {mode === 'invoice' && coreHeaders.length > 0 && (
+        {/* 핵심 컬럼 토글 (order/invoice 공통) */}
+        {coreHeaders.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2 bg-amber-500/5 border-b border-amber-500/15">
             <span className="text-xs text-amber-400/70">
               핵심 컬럼: {coreHeaders.join(' · ')}
@@ -426,8 +475,8 @@ export function ColumnMapper({
                 const isExpanded   = expandedAppend.has(b2bCol)
                 const hasAppend    = appendVal.trim() !== ''
                 const isMapped     = !!orderCol || hasAppend
-                // 핵심→나머지 구분선 (invoice 전체보기 시)
-                const isFirstNonCore = mode === 'invoice' && !coreOnly
+                // 핵심→나머지 구분선 (전체보기 시)
+                const isFirstNonCore = !coreOnly
                   && idx === coreHeaders.length && nonCoreHeaders.length > 0
 
                 return (
@@ -498,7 +547,7 @@ export function ColumnMapper({
                         </option>
                         {sortedOrderHeaders.map((h) => (
                           <option key={h} value={h} className="bg-dark-card dark:bg-dark-card bg-white">
-                            {h}
+                            {ORDER_IDENTITY_COLUMNS.has(h) ? `🔑 ${h}` : h}
                           </option>
                         ))}
                       </select>

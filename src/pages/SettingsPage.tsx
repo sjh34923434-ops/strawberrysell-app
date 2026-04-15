@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2 } from 'lucide-react'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
@@ -27,7 +27,11 @@ function Section({ title, icon: Icon, children }: {
 export function SettingsPage() {
   const { user }                        = useAuthStore()
   const { licenseKey, isActivated, expiresAt, isLoading, error, activate, clearError } = useLicenseStore()
-  const { matchingSettings, updateMatchingSettings, fontSize, setFontSize, mappingPresets } = useSettingsStore()
+  const {
+    matchingSettings, updateMatchingSettings, fontSize, setFontSize, mappingPresets,
+    savedOrders, deleteSavedOrder,
+    supplierMappingPresets, deleteSupplierMappingPreset,
+  } = useSettingsStore()
 
   const [newLicenseKey, setNewLicenseKey] = useState('')
   const [activateSuccess, setActivateSuccess] = useState(false)
@@ -275,6 +279,47 @@ export function SettingsPage() {
                   {matchingSettings.outputFilePrefix}_20240101.xlsx
                 </span>
               </p>
+            </div>
+          </div>
+        </Section>
+
+        {/* 저장 데이터 관리 */}
+        <Section title="저장 데이터 관리" icon={Trash2}>
+          <div className="space-y-4">
+            {/* 저장된 주문 */}
+            <div className="flex items-center justify-between py-2 border-b border-dark-border">
+              <div>
+                <p className="text-sm font-medium text-slate-300">저장된 주문</p>
+                <p className="text-xs text-slate-500 mt-0.5">매칭탭에서 사용하는 주문 목록</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400">{savedOrders.length}개</span>
+                <button
+                  onClick={() => { if (window.confirm(`저장된 주문 ${savedOrders.length}개를 모두 삭제할까요?`)) savedOrders.forEach(o => deleteSavedOrder(o.id)) }}
+                  disabled={savedOrders.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Trash2 size={12} /> 전체 삭제
+                </button>
+              </div>
+            </div>
+
+            {/* 거래처 매핑 프리셋 */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-slate-300">거래처 매핑 프리셋</p>
+                <p className="text-xs text-slate-500 mt-0.5">송장번호 탭 자동인식 설정</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400">{supplierMappingPresets.length}개</span>
+                <button
+                  onClick={() => { if (window.confirm(`거래처 매핑 프리셋 ${supplierMappingPresets.length}개를 모두 삭제할까요?`)) supplierMappingPresets.forEach(p => deleteSupplierMappingPreset(p.id)) }}
+                  disabled={supplierMappingPresets.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Trash2 size={12} /> 전체 삭제
+                </button>
+              </div>
             </div>
           </div>
         </Section>

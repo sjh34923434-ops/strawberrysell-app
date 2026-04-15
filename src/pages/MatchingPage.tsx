@@ -12,6 +12,7 @@ import { FileUploader }    from '../components/FileUploader'
 import { ColumnMapper }    from '../components/ColumnMapper'
 import { MatchingPreview } from '../components/MatchingPreview'
 import { DownloadButton }  from '../components/DownloadButton'
+import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { readExcelFile, type ParsedExcel } from '../utils/excelReader'
 import {
   fillB2bFromOrder,
@@ -20,6 +21,7 @@ import {
   type FillResult,
 } from '../utils/fillMapper'
 import { useSettingsStore, type MappingPreset } from '../stores/settingsStore'
+import type { ExcelRow } from '../utils/excelReader'
 
 // 드래그 가능한 프리셋 아이템
 function SortablePresetItem({ preset, onLoad }: { preset: MappingPreset; onLoad: (id: string) => void }) {
@@ -49,7 +51,8 @@ function SortablePresetItem({ preset, onLoad }: { preset: MappingPreset; onLoad:
 
 // base64 → File 변환
 function base64ToFile(base64: string, fileName: string): File {
-  const byteStr = atob(base64)
+  const raw = base64.includes(',') ? base64.split(',')[1] : base64
+  const byteStr = atob(raw)
   const arr = new Uint8Array(byteStr.length)
   for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i)
   return new File([arr], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -70,7 +73,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 // ─── 모드 정의 ────────────────────────────────────────────────────────────────
 
-type PageMode = 'order' | 'invoice'
+type PageMode = 'order' | 'invoice-saved'
 
 const MODE_CONFIG = {
   order: {
@@ -138,13 +141,13 @@ export function MatchingPage() {
   const [_presetLoaded,  setPresetLoaded]   = useState(false)
   const [loadedPresetId, setLoadedPresetId] = useState<string | undefined>(undefined)
 
-  const { mappingPresets, reorderPresets } = useSettingsStore()
+  const { mappingPresets, reorderPresets, saveOrder } = useSettingsStore()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const resultRef = useRef<HTMLDivElement>(null)
   const skipAutoMatchRef = useRef(false)
 
-  const cfg = MODE_CONFIG[mode]
+  const cfg = MODE_CONFIG['order']
 
   // 모드 전환 시 초기화
   const handleModeChange = (newMode: PageMode) => {
@@ -197,11 +200,12 @@ export function MatchingPage() {
     try {
       const parsed = await readExcelFile(file)
       setOrderData(parsed)
+      saveOrder('matching', parsed.headers, parsed.rows as Record<string, unknown>[])
     } catch (err) {
       setError(err instanceof Error ? err.message : '파일을 읽는 중 오류가 발생했습니다.')
       setOrderFile(null)
     }
-  }, [])
+  }, [saveOrder])
 
   const handleB2bFile = useCallback(async (file: File | null) => {
     setB2bFile(file)
@@ -281,14 +285,14 @@ export function MatchingPage() {
             주문 → B2B 입력
           </button>
           <button
-            onClick={() => handleModeChange('invoice')}
+            onClick={() => handleModeChange('invoice-saved')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200
-              ${mode === 'invoice'
+              ${mode === 'invoice-saved'
                 ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 shadow-sm'
                 : 'bg-[#0d2d3d] text-[#5ba8c4] border-[#1a4a60]'}`}
           >
             <Truck size={15} />
-            송장번호 입력
+            송장번호 추가
           </button>
         </div>
 
@@ -296,7 +300,7 @@ export function MatchingPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className={`text-xl font-bold transition-colors duration-200
-              ${mode === 'invoice' ? 'text-amber-300' : 'text-slate-100 dark:text-slate-100 text-gray-900'}`}>
+              ${false ? 'text-amber-300' : 'text-slate-100 dark:text-slate-100 text-gray-900'}`}>
               {cfg.label}
             </h1>
             <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500 mt-1">
@@ -329,7 +333,7 @@ export function MatchingPage() {
         </div>
 
         {/* 송장입력 모드 안내 배너 */}
-        {mode === 'invoice' && (
+        {false && (
           <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 animate-fade-in">
             <Truck size={15} className="text-amber-400 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-300/90 leading-relaxed">
@@ -386,14 +390,13 @@ export function MatchingPage() {
         <div className={`
           bg-dark-card dark:bg-dark-card bg-white rounded-2xl p-6 space-y-4
           border transition-colors duration-300
-          ${mode === 'invoice'
+          ${false
             ? 'border-amber-500/30 dark:border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.07)]'
             : 'border-dark-border dark:border-dark-border border-gray-200'}
         `}>
-          {/* 파일 1 */}
+          {/* 주문 파일 (데이터 원본) */}
           <div className="flex flex-col gap-2">
-            <p className={`text-xs font-medium uppercase tracking-wider transition-colors duration-200
-              ${mode === 'invoice' ? 'text-amber-400/80' : 'text-slate-400'}`}>
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
               {cfg.file1Label}
             </p>
             <FileUploader label="" file={orderFile} onFileChange={handleOrderFile} />
@@ -405,22 +408,13 @@ export function MatchingPage() {
             )}
           </div>
 
-          <div className={`border-t transition-colors duration-200 ${mode === 'invoice' ? 'border-amber-500/20' : 'border-dark-border dark:border-dark-border border-gray-100'}`} />
-
-          {/* 파일 2 */}
-          <div className="flex flex-col gap-2">
-            <p className={`text-xs font-medium uppercase tracking-wider transition-colors duration-200
-              ${mode === 'invoice' ? 'text-amber-400/80' : 'text-slate-400'}`}>
-              {cfg.file2Label}
-            </p>
-            <FileUploader label="" file={b2bFile} onFileChange={handleB2bFile} />
-            {b2bData && (
-              <p className="text-xs text-slate-500">
-                <span className="text-slate-300 dark:text-slate-300 text-gray-700 font-medium">컬럼 {b2bData.headers.length}개</span>
-                {' '}감지됨
-              </p>
-            )}
-          </div>
+          {/* B2B 양식 미로드 시 안내 */}
+          {orderData && !b2bData && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary-500/8 border border-primary-500/20 text-xs text-primary-400/80">
+              <FolderOpen size={12} className="shrink-0" />
+              위 <span className="font-semibold text-primary-300">불러오기</span>에서 등록된 거래처 B2B 양식을 선택하세요
+            </div>
+          )}
         </div>
 
         {/* ── 컬럼 매핑 ───────────────────────────────────────────────────────── */}
@@ -428,7 +422,7 @@ export function MatchingPage() {
           <div className={`
             bg-dark-card dark:bg-dark-card bg-white rounded-2xl p-6 space-y-5 animate-slide-up
             border transition-colors duration-300
-            ${mode === 'invoice'
+            ${false
               ? 'border-amber-500/30 dark:border-amber-500/30'
               : 'border-dark-border dark:border-dark-border border-gray-200'}
           `}>
@@ -440,7 +434,7 @@ export function MatchingPage() {
               b2bFileName={b2bFile?.name}
               b2bFileData={b2bFileBase64}
               loadedPresetId={loadedPresetId}
-              mode={mode}
+              mode={mode as 'order' | 'invoice'}
               onMappingChange={(m) => { setMapping(m); setPresetLoaded(false) }}
               onAppendValuesChange={setAppendValues}
             />
@@ -453,7 +447,7 @@ export function MatchingPage() {
                 py-3 rounded-xl text-sm font-semibold text-white
                 disabled:opacity-40 disabled:cursor-not-allowed
                 transition-all duration-150 active:scale-[0.99] shadow-lg
-                ${mode === 'invoice'
+                ${false
                   ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 shadow-amber-500/20'
                   : 'bg-primary-500 hover:bg-primary-600 active:bg-primary-700 shadow-primary-500/20'}
               `}
@@ -470,15 +464,15 @@ export function MatchingPage() {
         {result && (
           <div ref={resultRef} className="space-y-4 animate-slide-up">
             <div className={`flex items-start gap-3 px-4 py-3.5 rounded-xl animate-fade-in
-              ${mode === 'invoice'
+              ${false
                 ? 'bg-emerald-500/30 border border-emerald-400/50'
                 : 'bg-orange-500/40 border border-orange-400/50'}`}>
-              <CheckCircle2 size={18} className={`shrink-0 mt-0.5 ${mode === 'invoice' ? 'text-emerald-300' : 'text-orange-300'}`} />
+              <CheckCircle2 size={18} className={`shrink-0 mt-0.5 ${false ? 'text-emerald-300' : 'text-orange-300'}`} />
               <div>
-                <p className={`text-sm font-semibold ${mode === 'invoice' ? 'text-emerald-200' : 'text-orange-200'}`}>
-                  {mode === 'invoice' ? '송장번호 입력이 완료되었습니다.' : '변환이 완료되었습니다.'}
+                <p className={`text-sm font-semibold ${false ? 'text-emerald-200' : 'text-orange-200'}`}>
+                  {false ? '송장번호 입력이 완료되었습니다.' : '변환이 완료되었습니다.'}
                 </p>
-                <p className={`text-xs mt-0.5 ${mode === 'invoice' ? 'text-emerald-300/80' : 'text-orange-300/80'}`}>
+                <p className={`text-xs mt-0.5 ${false ? 'text-emerald-300/80' : 'text-orange-300/80'}`}>
                   아래 내용을 확인하시고 파일을 다운로드하세요!
                 </p>
               </div>
@@ -487,7 +481,7 @@ export function MatchingPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">
                 총{' '}
-                <span className={mode === 'invoice' ? 'text-amber-400' : 'text-primary-400'}>
+                <span className={false ? 'text-amber-400' : 'text-primary-400'}>
                   {result.totalRows.toLocaleString()}
                 </span>행
               </p>
@@ -511,6 +505,11 @@ export function MatchingPage() {
             뒤로가기
           </button>
         </div>
+
+        {/* ── 송장번호 전송 탭 ─────────────────────────────────────────────────── */}
+        {mode === 'invoice-saved' && (
+          <InvoiceMatchTab source="matching" />
+        )}
 
       </div>
     </div>

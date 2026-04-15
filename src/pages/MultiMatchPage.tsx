@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import {
   Loader2, Play, RotateCcw, AlertCircle, CheckCircle2,
   Plus, Trash2, Download, ChevronDown, ChevronUp,
-  Save, FolderOpen, X, AlertTriangle,
+  Save, FolderOpen, X, AlertTriangle, Layers, Truck, Tag,
 } from 'lucide-react'
 import { FileUploader } from '../components/FileUploader'
+import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { readExcelFile, type ParsedExcel } from '../utils/excelReader'
 import { runMultiMatch, getUniqueValuesWithCount, type PartnerMatchResult } from '../utils/multiMatcher'
 import { downloadFilledB2b } from '../utils/excelWriter'
@@ -19,7 +20,9 @@ const RECOMMEND_COLS = ['업체상품코드', '등록상품명', '옵션id', '�
 // ─── 헬퍼 ──────────────────────────────────────────────────────────────────────
 
 function base64ToFile(base64: string, fileName: string): File {
-  const byteStr = atob(base64)
+  // data URL 접두사 제거 (data:...;base64, 형태 처리)
+  const raw = base64.includes(',') ? base64.split(',')[1] : base64
+  const byteStr = atob(raw)
   const arr = new Uint8Array(byteStr.length)
   for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i)
   return new File([arr], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -32,6 +35,7 @@ interface LocalPartner {
   partnerName:      string
   b2bTemplateId:    string
   b2bHeaders:       string[]
+  b2bFileName?:     string   // CoupangPartner에서 자동 분류 시 직접 저장
   mappingPresetId:  string
   mapping:          ColumnMapping
   appendValues:     Record<string, string>
@@ -81,10 +85,95 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
+// ─── 결과 카드 (미리보기 포함) ────────────────────────────────────────────────
+
+const PREVIEW_ROWS = 5
+
+function ResultCard({ result, onDownload }: { result: PartnerMatchResult; onDownload: (r: PartnerMatchResult) => void }) {
+  const [open, setOpen] = React.useState(false)
+  const previewHeaders = result.b2bHeaders.slice(0, 8)   // 최대 8컬럼
+  const previewRows    = result.rows.slice(0, PREVIEW_ROWS)
+
+  return (
+    <div className="rounded-xl bg-dark-card border border-dark-border overflow-hidden">
+      {/* 헤더 행 */}
+      <div className="flex items-center gap-4 px-5 py-4">
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-500/10 shrink-0">
+          <CheckCircle2 size={18} className="text-emerald-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-200 truncate">{result.partnerName}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            총 <span className="text-emerald-400 font-medium">{result.rowCount.toLocaleString()}행</span> 처리됨
+            {' · '}컬럼 {result.b2bHeaders.length}개
+          </p>
+        </div>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-dark-border hover:border-slate-600 transition-all shrink-0"
+        >
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {open ? '접기' : '미리보기'}
+        </button>
+        <button
+          onClick={() => onDownload(result)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all shrink-0"
+        >
+          <Download size={13} /> 다운로드
+        </button>
+      </div>
+
+      {/* 미리보기 테이블 */}
+      {open && (
+        <div className="border-t border-dark-border/60 overflow-x-auto">
+          {result.rows.length === 0 ? (
+            <p className="text-xs text-slate-500 px-5 py-3">데이터가 없습니다.</p>
+          ) : (
+            <>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-dark-hover/60">
+                    {previewHeaders.map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-medium text-slate-400 whitespace-nowrap border-r border-dark-border/40 last:border-r-0">
+                        {h}
+                      </th>
+                    ))}
+                    {result.b2bHeaders.length > 8 && (
+                      <th className="px-3 py-2 text-slate-600 whitespace-nowrap">+{result.b2bHeaders.length - 8}개</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-transparent' : 'bg-dark-hover/20'}>
+                      {previewHeaders.map(h => (
+                        <td key={h} className="px-3 py-1.5 text-slate-300 whitespace-nowrap border-r border-dark-border/30 last:border-r-0 max-w-[180px] truncate">
+                          {String(row[h] ?? '')}
+                        </td>
+                      ))}
+                      {result.b2bHeaders.length > 8 && <td />}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {result.rows.length > PREVIEW_ROWS && (
+                <p className="text-[10px] text-slate-600 px-4 py-2 border-t border-dark-border/40">
+                  상위 {PREVIEW_ROWS}행 표시 중 — 전체 {result.rows.length}행은 다운로드 후 확인
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── 메인 ──────────────────────────────────────────────────────────────────────
 
 export function MultiMatchPage() {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab]         = useState<'match' | 'invoice'>('match')
   const [step, setStep]                   = useState<Step>(1)
   const [orderFile, setOrderFile]         = useState<File | null>(null)
   const [orderData, setOrderData]         = useState<ParsedExcel | null>(null)
@@ -101,7 +190,9 @@ export function MultiMatchPage() {
 
   const {
     mappingPresets,
+    coupangPartners,
     multiMatchConfigs, saveMultiMatchConfig, deleteMultiMatchConfig,
+    saveOrder,
   } = useSettingsStore()
 
   // ─── 파생 데이터 ─────────────────────────────────────────────────────────────
@@ -134,13 +225,108 @@ export function MultiMatchPage() {
     try {
       const parsed = await readExcelFile(file)
       setOrderData(parsed)
+      saveOrder('multi-match', parsed.headers, parsed.rows as Record<string, unknown>[])
     } catch (err) {
       setError(err instanceof Error ? err.message : '주문 파일을 읽는 중 오류가 발생했습니다.')
       setOrderFile(null)
     }
-  }, [])
+  }, [saveOrder])
 
-  // ─── 파트너 조작 ─────────────────────────────────────────────────────────────
+  // ─── 접두어 자동 분류 ──────────────────────────────────────────────────────────
+
+  const handleAutoClassify = async () => {
+    if (!orderData || !classifyColumn || coupangPartners.length === 0) return
+    const currentVals = new Set(uniqueValues.map(v => v.value))
+    const loaded: LocalPartner[] = []
+
+    for (const cp of coupangPartners) {
+      let matched: string[] = []
+
+      // ① 저장된 마켓 주문 샘플 파일에서 classifyColumn 값 추출 → 현재 주문과 교집합
+      if (cp.marketFileData) {
+        try {
+          const file   = base64ToFile(cp.marketFileData, cp.marketFileName ?? '마켓주문.xlsx')
+          const parsed = await readExcelFile(file)
+          // 같은 컬럼명 먼저, 없으면 업체상품코드 패턴으로 찾기
+          const col = parsed.headers.find(h => h === classifyColumn)
+            ?? parsed.headers.find(h => /업체상품코드/i.test(h))
+          if (col) {
+            const sampleVals = new Set(
+              parsed.rows.map(r => String(r[col] ?? '').trim()).filter(Boolean)
+            )
+            matched = [...currentVals].filter(v => sampleVals.has(v))
+          }
+        } catch { /* ignore */ }
+      }
+
+      // ② 샘플 파일이 없거나 매칭 못 찾으면 접두어로 fallback
+      if (matched.length === 0 && cp.prefix) {
+        matched = [...currentVals].filter(v => v.startsWith(cp.prefix))
+      }
+
+      if (matched.length === 0) continue
+
+      let headers: string[] = cp.b2bHeaders ?? []
+      if (headers.length === 0 && cp.b2bFileData) {
+        try {
+          const file   = base64ToFile(cp.b2bFileData, cp.b2bFileName ?? 'B2B양식.xlsx')
+          const parsed = await readExcelFile(file)
+          headers = parsed.headers
+        } catch { /* ignore */ }
+      }
+
+      loaded.push({
+        id:              Date.now().toString() + Math.random().toString(36).slice(2),
+        partnerName:     cp.partnerName,
+        b2bTemplateId:   '',
+        b2bHeaders:      headers,
+        b2bFileName:     cp.b2bFileName?.replace(/\.[^/.]+$/, ''),
+        mappingPresetId: '',
+        mapping:         cp.mapping,
+        appendValues:    cp.appendValues,
+        matchValues:     matched,
+        loadingTemplate: false,
+        expanded:        false,
+      })
+    }
+
+    if (loaded.length === 0) return
+    setPartners(loaded)
+    setStep(2)
+
+    // 분류 완료 후 바로 매칭 실행 (state 업데이트 대기 없이 loaded 직접 사용)
+    setIsProcessing(true)
+    setError(null)
+    try {
+      const res = await new Promise<ReturnType<typeof runMultiMatch>>((resolve, reject) => {
+        setTimeout(() => {
+          try {
+            resolve(runMultiMatch(
+              orderData.rows,
+              classifyColumn,
+              loaded.map(p => ({
+                partnerName:  p.partnerName,
+                matchValues:  p.matchValues,
+                b2bHeaders:   p.b2bHeaders,
+                mapping:      p.mapping,
+                appendValues: p.appendValues,
+                b2bFileName:  p.b2bFileName,
+              })),
+            ))
+          } catch (e) { reject(e) }
+        }, 0)
+      })
+      setResults(res.partners)
+      setUnmatchedCount(res.unmatchedCount)
+      setStep(3)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '자동 매칭 중 오류가 발생했습니다.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // ─── 파트너 조작 ──────────────────────────────────────────────────────────────
 
   const addPartner = () => {
     setPartners(prev => [...prev, {
@@ -274,7 +460,7 @@ export function MultiMatchPage() {
                 b2bHeaders:   p.b2bHeaders,
                 mapping:      p.mapping,
                 appendValues: p.appendValues,
-                b2bFileName:  mappingPresets.find(m => m.id === p.b2bTemplateId)?.b2bFileName?.replace(/\.[^/.]+$/, ''),
+                b2bFileName:  p.b2bFileName ?? mappingPresets.find(m => m.id === p.b2bTemplateId)?.b2bFileName?.replace(/\.[^/.]+$/, ''),
               })),
             ))
           } catch (e) { reject(e) }
@@ -327,6 +513,34 @@ export function MultiMatchPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-dark-bg dark:bg-dark-bg bg-gray-50">
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-6 animate-fade-in">
+
+        {/* 탭 */}
+        <div className="flex items-center gap-2 p-1 rounded-xl bg-dark-card border border-dark-border">
+          <button
+            onClick={() => setActiveTab('match')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
+              ${activeTab === 'match'
+                ? 'bg-primary-500/15 text-primary-300 border-primary-500/40'
+                : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+          >
+            <Layers size={15} /> 일괄 매칭
+          </button>
+          <button
+            onClick={() => setActiveTab('invoice')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
+              ${activeTab === 'invoice'
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+          >
+            <Truck size={15} /> 송장번호 추가
+          </button>
+        </div>
+
+        {/* 송장 탭 */}
+        {activeTab === 'invoice' && <InvoiceMatchTab source="multi-match" />}
+
+        {/* 매칭 탭 */}
+        {activeTab === 'match' && <div className="space-y-6">
 
         {/* 헤더 */}
         <div className="flex items-start justify-between">
@@ -444,7 +658,15 @@ export function MultiMatchPage() {
                 분류 기준: <span className="text-primary-400 font-medium">{classifyColumn}</span>
                 {' · '}고유값 {uniqueValues.length}개
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
+                {coupangPartners.length > 0 && (
+                  <button
+                    onClick={handleAutoClassify}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/15 text-primary-300 border border-primary-500/30 hover:bg-primary-500/25 transition-all"
+                  >
+                    <Tag size={11} /> 접두어로 자동 분류 + 실행
+                  </button>
+                )}
                 <button
                   onClick={() => setShowSaveModal(true)}
                   disabled={partners.length === 0}
@@ -560,23 +782,7 @@ export function MultiMatchPage() {
             {/* 결과 카드 */}
             <div className="space-y-3">
               {results.map((r) => (
-                <div key={r.partnerName} className="flex items-center gap-4 px-5 py-4 rounded-xl bg-dark-card dark:bg-dark-card bg-white border border-dark-border dark:border-dark-border border-gray-200">
-                  <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-500/10 shrink-0">
-                    <CheckCircle2 size={18} className="text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800 truncate">{r.partnerName}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      총 <span className="text-emerald-400 font-medium">{r.rowCount.toLocaleString()}행</span> 처리됨
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownload(r)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all shrink-0"
-                  >
-                    <Download size={13} /> 다운로드
-                  </button>
-                </div>
+                <ResultCard key={r.partnerName} result={r} onDownload={handleDownload} />
               ))}
 
               {/* 미분류 경고 */}
@@ -600,32 +806,34 @@ export function MultiMatchPage() {
           </div>
         )}
 
-      </div>
-
-      {/* 설정 저장 모달 */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-80 bg-dark-card dark:bg-dark-card bg-white rounded-2xl border border-dark-border p-5 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800">설정 저장</h3>
-              <button onClick={() => setShowSaveModal(false)} className="text-slate-500 hover:text-slate-300"><X size={16} /></button>
-            </div>
-            <p className="text-xs text-slate-500 mb-3">
-              파트너 {partners.length}개 · 분류 기준: {classifyColumn}
-            </p>
-            <input
-              autoFocus type="text" placeholder="예: 3사 통합 매칭"
-              value={saveName} onChange={e => setSaveName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSaveConfig()}
-              className="w-full px-3 py-2.5 rounded-xl text-sm mb-3 bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border text-slate-200 dark:text-slate-200 text-gray-800 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-            <div className="flex gap-2">
-              <button onClick={() => setShowSaveModal(false)} className="flex-1 py-2 rounded-xl text-sm text-slate-400 bg-dark-hover hover:bg-dark-muted transition-colors">취소</button>
-              <button onClick={handleSaveConfig} disabled={!saveName.trim()} className="flex-[2] py-2 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 transition-colors">저장</button>
+        {/* 설정 저장 모달 */}
+        {showSaveModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="w-80 bg-dark-card dark:bg-dark-card bg-white rounded-2xl border border-dark-border p-5 shadow-2xl animate-fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800">설정 저장</h3>
+                <button onClick={() => setShowSaveModal(false)} className="text-slate-500 hover:text-slate-300"><X size={16} /></button>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                파트너 {partners.length}개 · 분류 기준: {classifyColumn}
+              </p>
+              <input
+                autoFocus type="text" placeholder="예: 3사 통합 매칭"
+                value={saveName} onChange={e => setSaveName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSaveConfig()}
+                className="w-full px-3 py-2.5 rounded-xl text-sm mb-3 bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border text-slate-200 dark:text-slate-200 text-gray-800 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setShowSaveModal(false)} className="flex-1 py-2 rounded-xl text-sm text-slate-400 bg-dark-hover hover:bg-dark-muted transition-colors">취소</button>
+                <button onClick={handleSaveConfig} disabled={!saveName.trim()} className="flex-[2] py-2 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 transition-colors">저장</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        </div>}
+
+      </div>
     </div>
   )
 }
