@@ -68,7 +68,7 @@ export function DashboardPage() {
           <div>
             <p className="text-sm font-bold text-red-400">처음 이용 시 가장 먼저 할 일!!</p>
             <p className="text-sm text-red-300/90 mt-1 leading-relaxed">
-              주문매칭 탭에서 사용할 엑셀파일을 업로드 후 각 마켓에 맞게 컬럼 매핑을 적용하고 저장해 주세요!
+              거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해 주세요!
             </p>
           </div>
         </div>
@@ -219,32 +219,6 @@ export function DashboardPage() {
               <ArrowRight
                 size={18}
                 className="text-cyan-400/60 group-hover:text-cyan-300 group-hover:translate-x-1 transition-all duration-150"
-              />
-            </button>
-
-            <button
-              onClick={() => navigate('/matching', { state: { mode: 'invoice' } })}
-              className="
-                w-full flex items-center gap-4 px-4 py-4 rounded-xl
-                bg-amber-500/15 hover:bg-amber-500/25
-                border border-amber-500/40 hover:border-amber-500/60
-                transition-all duration-150 group text-left
-              "
-            >
-              <div className="p-2.5 rounded-xl bg-amber-500/20">
-                <Truck size={20} className="text-amber-300" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-300">
-                  송장번호 입력 시작하기
-                </p>
-                <p className="text-xs text-amber-400/70 mt-0.5">
-                  B2B 파일(송장포함) → 마켓 업로드 양식으로 변환
-                </p>
-              </div>
-              <ArrowRight
-                size={18}
-                className="text-amber-400/60 group-hover:text-amber-300 group-hover:translate-x-1 transition-all duration-150"
               />
             </button>
           </div>

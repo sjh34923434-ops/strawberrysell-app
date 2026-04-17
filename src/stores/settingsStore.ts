@@ -10,32 +10,11 @@ interface MatchingSettings {
   outputFilePrefix: string
 }
 
-export interface MappingPreset {
-  id:            string
-  name:          string
-  mode?:         'order' | 'invoice'  // 없으면 'order' 로 취급 (하위 호환)
-  mapping:       ColumnMapping
-  appendValues?: Record<string, string>
-  b2bFileName?:  string
-  b2bFileData?:  string   // B2B 파일 base64 — 저장 시 함께 포함
-  createdAt:     string
-}
-
-export interface B2bTemplate {
-  id:       string
-  name:     string    // 표시 이름
-  fileName: string    // 원본 파일명
-  data:     string    // base64
-  size:     number
-  savedAt:  string
-}
-
 export interface PartnerRule {
   id:             string
   partnerName:    string    // 거래처 표시명
   matchValues:    string[]  // 분류 컬럼에서 이 값들이면 이 파트너로 분류
-  b2bTemplateId:  string    // 저장된 B2B 양식 ID
-  mappingPresetId:string    // 저장된 매핑 프리셋 ID
+  partnerId:      string    // 거래처관리에서 등록된 CoupangPartner ID
 }
 
 export interface MultiMatchConfig {
@@ -89,6 +68,8 @@ export interface SupplierMappingPreset {
   lastUsedAt:        string
 }
 
+export type FileNameDateFormat = 'YYYYMMDD' | 'YYYY-MM-DD' | 'YYYYMMDD_HHmmss'
+
 export type SavedOrderSource = 'coupang-api' | 'matching' | 'multi-match'
 
 export interface SavedOrder {
@@ -102,23 +83,18 @@ export interface SavedOrder {
 }
 
 interface SettingsState {
-  theme:            'dark' | 'light'
-  fontSize:         number
-  matchingSettings: MatchingSettings
-  mappingPresets:   MappingPreset[]
-  b2bTemplates:     B2bTemplate[]
+  theme:                'dark' | 'light'
+  fontSize:             number
+  matchingSettings:     MatchingSettings
+  fileNameDateEnabled:  boolean
+  fileNameDateFormat:   FileNameDateFormat
 
   setTheme:               (theme: 'dark' | 'light') => void
   toggleTheme:            () => void
   setFontSize:            (size: number) => void
   updateMatchingSettings: (s: Partial<MatchingSettings>) => void
-  savePreset:             (name: string, mapping: ColumnMapping, appendValues?: Record<string, string>, b2bFileName?: string, b2bFileData?: string, mode?: 'order' | 'invoice') => void
-  deletePreset:           (id: string) => void
-  reorderPresets:         (ids: string[]) => void
-  updatePreset:           (id: string, name: string) => void
-  replacePreset:          (id: string, mapping: ColumnMapping, appendValues?: Record<string, string>, b2bFileName?: string, b2bFileData?: string) => void
-  saveB2bTemplate:        (name: string, fileName: string, data: string, size: number) => void
-  deleteB2bTemplate:      (id: string) => void
+  setFileNameDateEnabled: (v: boolean) => void
+  setFileNameDateFormat:  (f: FileNameDateFormat) => void
 
   multiMatchConfigs:       MultiMatchConfig[]
   saveMultiMatchConfig:   (name: string, classifyColumn: string, rules: PartnerRule[]) => void
@@ -151,6 +127,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       theme: 'dark',
       fontSize: 18,
+      fileNameDateEnabled: true,
+      fileNameDateFormat:  'YYYYMMDD_HHmmss' as FileNameDateFormat,
       matchingSettings: {
         lastOrderColumn:  null,
         lastB2bColumn:    null,
@@ -158,8 +136,6 @@ export const useSettingsStore = create<SettingsState>()(
         caseInsensitive:  true,
         outputFilePrefix: '매칭결과',
       },
-      mappingPresets:      [],
-      b2bTemplates:        [],
       multiMatchConfigs:        [],
       coupangPartners:          [],
       marketTemplates:          [],
@@ -173,50 +149,8 @@ export const useSettingsStore = create<SettingsState>()(
       updateMatchingSettings: (s) =>
         set({ matchingSettings: { ...get().matchingSettings, ...s } }),
 
-      savePreset: (name, mapping, appendValues, b2bFileName, b2bFileData, mode) => {
-        const preset: MappingPreset = {
-          id:           Date.now().toString(),
-          name,
-          mode:         mode ?? 'order',
-          mapping,
-          appendValues,
-          b2bFileName,
-          b2bFileData,
-          createdAt:    new Date().toISOString(),
-        }
-        set({ mappingPresets: [...get().mappingPresets, preset] })
-      },
-
-      deletePreset: (id) =>
-        set({ mappingPresets: get().mappingPresets.filter((p) => p.id !== id) }),
-
-      reorderPresets: (ids) =>
-        set({ mappingPresets: ids.map(id => get().mappingPresets.find(p => p.id === id)!).filter(Boolean) }),
-
-      updatePreset: (id, name) =>
-        set({
-          mappingPresets: get().mappingPresets.map((p) =>
-            p.id === id ? { ...p, name } : p
-          ),
-        }),
-
-      replacePreset: (id, mapping, appendValues, b2bFileName, b2bFileData) =>
-        set({
-          mappingPresets: get().mappingPresets.map((p) =>
-            p.id === id ? { ...p, mapping, appendValues, b2bFileName, b2bFileData } : p
-          ),
-        }),
-
-      saveB2bTemplate: (name, fileName, data, size) => {
-        const t: B2bTemplate = {
-          id: Date.now().toString(), name, fileName, data, size,
-          savedAt: new Date().toISOString(),
-        }
-        set({ b2bTemplates: [...get().b2bTemplates, t] })
-      },
-
-      deleteB2bTemplate: (id) =>
-        set({ b2bTemplates: get().b2bTemplates.filter((t) => t.id !== id) }),
+      setFileNameDateEnabled: (v) => set({ fileNameDateEnabled: v }),
+      setFileNameDateFormat:  (f) => set({ fileNameDateFormat: f }),
 
       saveMultiMatchConfig: (name, classifyColumn, rules) => {
         const cfg: MultiMatchConfig = {

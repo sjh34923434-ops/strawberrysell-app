@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, AlertCircle,
-  Clock, CheckCircle2, Loader2, Download,
+  CheckCircle2, Loader2, Download,
   RotateCcw, Package, RefreshCw, Building2,
-  FlaskConical, FileSpreadsheet, Users,
+  FileSpreadsheet, Users,
   Truck,
   FolderOpen,
   Tag, Plus,
@@ -23,7 +23,6 @@ type Step = 1 | 2 | 3
 
 const STEPS = [
   { num: 1, label: '주문 가져오기' },
-  { num: 2, label: '파트너 설정' },
   { num: 3, label: '결과 다운로드' },
 ] as const
 
@@ -47,25 +46,6 @@ const CARRIER_MAP: Record<string, string> = {
   '일양택배':   'ILYANG',
   '천일택배':   'CHUNIL',
 }
-
-// 가상 주문 데이터 (DEV 테스트용)
-const MOCK_ORDERS = [
-  { 번호: 1,  묶음배송번호: 'B-001', 주문번호: 'C-20240101-001', 업체상품코드: 'A00000001', 등록상품명: '딸기 1kg',     옵션ID: 'OPT-001', 거래처명: '거래처A(달롬)', 수량: 3, 주문상태: '상품준비중', 금액: 45000 },
-  { 번호: 2,  묶음배송번호: 'B-002', 주문번호: 'C-20240101-002', 업체상품코드: 'A00000002', 등록상품명: '딸기 2kg',     옵션ID: 'OPT-002', 거래처명: '거래처B(달롬)', 수량: 1, 주문상태: '결제완료',   금액: 18000 },
-  { 번호: 3,  묶음배송번호: 'B-001', 주문번호: 'C-20240101-003', 업체상품코드: 'A00000001', 등록상품명: '딸기 1kg',     옵션ID: 'OPT-001', 거래처명: '거래처A(달롬)', 수량: 2, 주문상태: '상품준비중', 금액: 30000 },
-  { 번호: 4,  묶음배송번호: 'B-003', 주문번호: 'C-20240101-004', 업체상품코드: 'A00000003', 등록상품명: '딸기 500g',    옵션ID: 'OPT-003', 거래처명: '거래처C(달롬)', 수량: 5, 주문상태: '배송준비중', 금액: 75000 },
-  { 번호: 5,  묶음배송번호: 'B-002', 주문번호: 'C-20240101-005', 업체상품코드: 'A00000002', 등록상품명: '딸기 2kg',     옵션ID: 'OPT-002', 거래처명: '거래처B(달롬)', 수량: 2, 주문상태: '결제완료',   금액: 36000 },
-  { 번호: 6,  묶음배송번호: 'B-004', 주문번호: 'C-20240101-006', 업체상품코드: 'A00000004', 등록상품명: '딸기 선물세트', 옵션ID: 'OPT-004', 거래처명: '거래처D(달롬)', 수량: 1, 주문상태: '상품준비중', 금액: 22000 },
-  { 번호: 7,  묶음배송번호: 'B-001', 주문번호: 'C-20240101-007', 업체상품코드: 'A00000001', 등록상품명: '딸기 1kg',     옵션ID: 'OPT-001', 거래처명: '거래처A(달롬)', 수량: 4, 주문상태: '배송준비중', 금액: 60000 },
-  { 번호: 8,  묶음배송번호: 'B-003', 주문번호: 'C-20240101-008', 업체상품코드: 'A00000003', 등록상품명: '딸기 500g',    옵션ID: 'OPT-003', 거래처명: '거래처C(달롬)', 수량: 2, 주문상태: '배송중',     금액: 30000 },
-  { 번호: 9,  묶음배송번호: 'B-005', 주문번호: 'C-20240101-009', 업체상품코드: 'A00000005', 등록상품명: '딸기잼',       옵션ID: 'OPT-005', 거래처명: '거래처E(달롬)', 수량: 1, 주문상태: '결제완료',   금액: 15000 },
-  { 번호: 10, 묶음배송번호: 'B-002', 주문번호: 'C-20240101-010', 업체상품코드: 'A00000002', 등록상품명: '딸기 2kg',     옵션ID: 'OPT-002', 거래처명: '거래처B(달롬)', 수량: 3, 주문상태: '상품준비중', 금액: 54000 },
-  { 번호: 11, 묶음배송번호: 'B-004', 주문번호: 'C-20240101-011', 업체상품코드: 'A00000004', 등록상품명: '딸기 선물세트', 옵션ID: 'OPT-004', 거래처명: '거래처D(달롬)', 수량: 2, 주문상태: '배송준비중', 금액: 44000 },
-  { 번호: 12, 묶음배송번호: 'B-001', 주문번호: 'C-20240101-012', 업체상품코드: 'A00000001', 등록상품명: '딸기 1kg',     옵션ID: 'OPT-001', 거래처명: '거래처A(달롬)', 수량: 1, 주문상태: '배송중',     금액: 15000 },
-  { 번호: 13, 묶음배송번호: 'B-005', 주문번호: 'C-20240101-013', 업체상품코드: 'A00000005', 등록상품명: '딸기잼',       옵션ID: 'OPT-005', 거래처명: '거래처E(달롬)', 수량: 3, 주문상태: '상품준비중', 금액: 45000 },
-  { 번호: 14, 묶음배송번호: 'B-003', 주문번호: 'C-20240101-014', 업체상품코드: 'A00000003', 등록상품명: '딸기 500g',    옵션ID: 'OPT-003', 거래처명: '거래처C(달롬)', 수량: 1, 주문상태: '결제완료',   금액: 15000 },
-  { 번호: 15, 묶음배송번호: 'B-002', 주문번호: 'C-20240101-015', 업체상품코드: 'A00000002', 등록상품명: '딸기 2kg',     옵션ID: 'OPT-002', 거래처명: '거래처B(달롬)', 수량: 2, 주문상태: '배송준비중', 금액: 36000 },
-]
 
 const RECOMMENDED_CLASSIFY_COLS = ['업체상품코드', '등록상품명', '옵션ID']
 
@@ -111,7 +91,7 @@ export function CoupangAutoPage() {
   const navigate = useNavigate()
   const { businesses, isLoading: bizLoading, fetch: fetchBiz } = useBusinessStore()
   const {
-    mappingPresets, multiMatchConfigs, b2bTemplates,
+    multiMatchConfigs,
     coupangPartners, saveOrder, savedOrders,
   } = useSettingsStore()
 
@@ -126,8 +106,7 @@ export function CoupangAutoPage() {
   const [endDate,        setEndDate]        = useState<string>(() => new Date().toISOString().split('T')[0])
   const [isFetching,     setIsFetching]     = useState(false)
   const [fetchProgress,  setFetchProgress]  = useState(0)
-  const [fetchedOrders,  setFetchedOrders]  = useState<typeof MOCK_ORDERS | null>(null)
-  const [isMockMode,       setIsMockMode]       = useState(false)
+  const [fetchedOrders,  setFetchedOrders]  = useState<any[] | null>(null)
   const [selectedConfigId, setSelectedConfigId] = useState<string>('')
   const [classifyColumn,   setClassifyColumn]   = useState<string>('업체상품코드')
   const [isMatching,       setIsMatching]        = useState(false)
@@ -143,26 +122,16 @@ export function CoupangAutoPage() {
     coupangConns: b.connections.filter(c => c.marketplace === 'coupang'),
   })).filter(b => b.coupangConns.length > 0)
 
-  const multiMatchPresets = mappingPresets.filter((p: any) => p.mode === 'multi' || !p.mode)
+  const availablePartners = coupangPartners.filter(p => p.b2bFileData)
 
   const handleBizChange = (bizId: string) => {
     setSelectedBizId(bizId)
     const biz = coupangBizList.find(b => b.id === bizId)
     setSelectedConnId(biz?.coupangConns[0]?.id ?? '')
     setFetchedOrders(null)
-    setIsMockMode(false)
   }
 
   const canFetch = !!selectedConnId && !!startDate && !!endDate
-
-  const handleMockFetch = async () => {
-    setIsFetching(true)
-    setFetchedOrders(null)
-    await new Promise(r => setTimeout(r, 1200))
-    setFetchedOrders(MOCK_ORDERS)
-    setIsMockMode(true)
-    setIsFetching(false)
-  }
 
   const handleFetch = async () => {
     if (!selectedBizId || !selectedConnId) return
@@ -194,18 +163,22 @@ export function CoupangAutoPage() {
     }
   }
 
-  // ── 접두어 기반 자동 매칭 ──
+  // ── 접두어 앞 2글자 기반 자동 매칭 (일괄매칭과 동일 로직) ──
   const handleMatch = async () => {
     setIsMatching(true)
-    await new Promise(r => setTimeout(r, 500))
+    await new Promise(r => setTimeout(r, 300))
 
     if (!fetchedOrders) { setIsMatching(false); return }
 
     const result: Record<string, any[]> = {}
 
     for (const order of fetchedOrders) {
-      const code = String((order as any)['업체상품코드'] ?? '').toUpperCase()
-      const partner = coupangPartners.find(p => code.startsWith(p.prefix.toUpperCase()))
+      const code = String((order as any)[classifyColumn] ?? '')
+      const codeKey = code.slice(0, 2)
+      const partner = coupangPartners.find(p => {
+        const prefix = (p.prefix || p.partnerName).trim()
+        return prefix && code.slice(0, 2) === prefix.slice(0, 2)
+      })
       const key = partner ? partner.partnerName : '(미매칭)'
       if (!result[key]) result[key] = []
       result[key].push(order)
@@ -251,23 +224,23 @@ export function CoupangAutoPage() {
         </div>
 
         {/* ── 탭 ──────────────────────────────────────────────────────────── */}
-        <div className="flex rounded-xl overflow-hidden border border-dark-border bg-dark-card">
+        <div className="flex items-center gap-2 p-1 rounded-xl bg-dark-card border border-dark-border">
           <button
             onClick={() => setActiveTab('match')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
               ${activeTab === 'match'
-                ? 'bg-primary-500/20 text-primary-300 border-b-2 border-primary-400'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-dark-hover'
+                ? 'bg-primary-500/15 text-primary-300 border-primary-500/40'
+                : 'text-slate-500 border-transparent hover:text-slate-300'
               }`}
           >
             <ShoppingCart size={14} /> 주문 매칭
           </button>
           <button
             onClick={() => setActiveTab('invoice')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
               ${activeTab === 'invoice'
-                ? 'bg-amber-500/15 text-amber-300 border-b-2 border-amber-400'
-                : 'bg-[#0d2d3d] text-[#5ba8c4] border-b-2 border-[#1a4a60]'
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                : 'text-slate-500 border-transparent hover:text-slate-300'
               }`}
           >
             <Truck size={14} /> 송장번호 추가
@@ -279,27 +252,6 @@ export function CoupangAutoPage() {
         ════════════════════════════════════════════════════════════════════ */}
         {activeTab === 'match' && (
           <>
-            {/* 배너 */}
-            {isMockMode ? (
-              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <Clock size={16} className="text-amber-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-400">쿠팡 API 인증 확인 중</p>
-                  <p className="text-xs text-amber-300/80 mt-0.5">
-                    쿠팡 Wing에서 API 인증이 승인되면 주문 가져오기가 활성화됩니다. (보통 1영업일 소요)
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/30">
-                <FlaskConical size={16} className="text-violet-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-violet-400">테스트 모드</p>
-                  <p className="text-xs text-violet-300/80 mt-0.5">가상 주문 데이터로 전체 흐름을 테스트하고 있습니다.</p>
-                </div>
-              </div>
-            )}
-
             <StepIndicator current={step} />
 
             {/* ── STEP 1 ── */}
@@ -370,13 +322,12 @@ export function CoupangAutoPage() {
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
                       <CheckCircle2 size={14} />
                       주문 <span className="font-bold">{fetchedOrders.length}건</span> 가져왔습니다
-                      {isMockMode && <span className="text-xs text-violet-400 ml-1">(가상 데이터)</span>}
                     </div>
                   )}
                 </div>
 
                 <p className="text-xs text-center text-slate-400 bg-dark-hover border border-dark-border rounded-xl px-4 py-2.5">
-                  💡 <span className="text-amber-400 font-medium">일괄매칭</span>에서 미리 설정 해놓아야 자동매칭됩니다!
+                  💡 거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해야 적용됩니다.
                 </p>
 
                 <button disabled={!canFetch || isFetching || coupangBizList.length === 0} onClick={handleFetch}
@@ -413,16 +364,10 @@ export function CoupangAutoPage() {
                   )
                 )}
 
-                {import.meta.env.DEV && (
-                  <button disabled={isFetching} onClick={handleMockFetch}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                    {isFetching ? <><Loader2 size={14} className="animate-spin" /> 생성 중...</> : <><FlaskConical size={14} /> 가상 주문 15건으로 테스트</>}
-                  </button>
-                )}
-
-                <button disabled={fetchedOrders === null} onClick={() => setStep(2)}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20">
-                  다음: 파트너 설정 →
+                <button disabled={fetchedOrders === null || coupangPartners.length === 0 || isMatching}
+                  onClick={handleMatch}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20">
+                  {isMatching ? <><Loader2 size={14} className="animate-spin" /> 매칭 중...</> : '매칭 실행 →'}
                 </button>
                 <button onClick={() => navigate('/dashboard')}
                   className="w-full py-2.5 rounded-xl text-sm font-medium bg-dark-hover border border-dark-border text-slate-300 hover:bg-dark-muted transition-all">
@@ -620,20 +565,10 @@ export function CoupangAutoPage() {
                   <Download size={15} /> 전체 ZIP 다운로드
                 </button>
 
-                {isMockMode && (
-                  <p className="text-center text-xs text-violet-400/70">* 테스트 모드 — 실제 파일이 생성되지 않습니다</p>
-                )}
-
-                <div className="flex gap-3">
-                  <button onClick={() => setStep(2)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-dark-hover border border-dark-border text-slate-300 hover:bg-dark-muted transition-all">
-                    ← 이전
-                  </button>
-                  <button onClick={() => { setStep(1); setFetchedOrders(null); setIsMockMode(false); setSelectedConfigId('') }}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-dark-hover border border-dark-border text-slate-400 hover:text-slate-200 transition-all">
-                    <RotateCcw size={13} /> 처음부터
-                  </button>
-                </div>
+                <button onClick={() => { setStep(1); setMatchResult({}) }}
+                  className="w-full py-2.5 rounded-xl text-sm font-medium bg-dark-hover border border-dark-border text-slate-300 hover:bg-dark-muted transition-all">
+                  ← 이전 (주문 가져오기로)
+                </button>
               </div>
             )}
           </>

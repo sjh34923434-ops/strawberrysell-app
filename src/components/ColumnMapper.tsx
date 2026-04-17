@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useState, useMemo, useEffect } from 'react'
 import { ArrowRight, Wand2, CheckCircle2, Save, Trash2, BookOpen, X, PlusCircle, KeyRound } from 'lucide-react'
 import { autoMatchColumns, SEPARATE_DELIVERY_PATTERN, type ColumnMapping } from '../utils/fillMapper'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -90,27 +90,20 @@ export function ColumnMapper({
   const [saveMode, setSaveMode]         = useState<'update' | 'new'>('update')
   const [saveName, setSaveName]         = useState('')
   const [showPresets, setShowPresets]   = useState(false)
-  const [coreOnly, setCoreOnly]         = useState(false)
   // 추가 텍스트 입력창이 열린 컬럼 목록
   const [expandedAppend, setExpandedAppend] = useState<Set<string>>(
     () => new Set(Object.keys(appendValues).filter((k) => appendValues[k] !== ''))
   )
 
-  const { mappingPresets, savePreset, deletePreset, replacePreset } = useSettingsStore()
+  // 거래처 불러오기 시 appendValues가 바뀌면 열린 입력창 동기화
+  useEffect(() => {
+    setExpandedAppend(new Set(Object.keys(appendValues).filter(k => appendValues[k] !== '')))
+  }, [loadedPresetId])
+
+  const { coupangPartners, updateCoupangPartner } = useSettingsStore()
   const sortedOrderHeaders = useMemo(() => sortOrderHeaders(orderHeaders), [orderHeaders])
 
-  // 핵심 컬럼 감지 패턴 (송장 탭 + 주문 탭 공통)
-  const CORE_PATTERNS = [
-    /^번호$/, /주문번호/, /택배사/, /운송장번호/, /분리배송.*[Yy\/]/, /옵션.?id/i,
-    /묶음배송/, /노출상품.*id/i, /업체상품코드/, /수취인이름|수취인명/, /수취인전화/, /수취인주소/,
-  ]
-  const isCoreCol = (col: string) => CORE_PATTERNS.some((p) => p.test(col))
-  const coreHeaders    = b2bHeaders.filter(isCoreCol)
-  const nonCoreHeaders = b2bHeaders.filter((c) => !isCoreCol(c))
-  // coreOnly ON이면 핵심만, 아니면 핵심 → 나머지 순서로
-  const displayHeaders = coreOnly
-    ? coreHeaders
-    : [...coreHeaders, ...nonCoreHeaders]
+  const displayHeaders = b2bHeaders
 
   const mappedCount = b2bHeaders.filter((col) => {
     return !!(mapping[col]) || !!(appendValues[col] ?? '').trim()
@@ -161,13 +154,9 @@ export function ColumnMapper({
 
   const handleSave = () => {
     const cleanAppend = cleanAppendValues()
-    if (saveMode === 'update' && loadedPresetId) {
-      replacePreset(loadedPresetId, mapping, cleanAppend, b2bFileName, b2bFileData)
-    } else {
-      if (!saveName.trim()) return
-      savePreset(saveName.trim(), mapping, cleanAppend, b2bFileName, b2bFileData, mode)
+    if (loadedPresetId) {
+      updateCoupangPartner(loadedPresetId, { mapping, appendValues: cleanAppend })
     }
-    setSaveName('')
     setShowSaveModal(false)
   }
 
@@ -189,63 +178,19 @@ export function ColumnMapper({
     <div className="space-y-3">
 
       {/* 저장 모달 */}
-      {showSaveModal && (
+      {showSaveModal && loadedPresetId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-84 bg-dark-card dark:bg-dark-card bg-white rounded-2xl border border-dark-border dark:border-dark-border border-gray-200 p-5 shadow-2xl animate-fade-in" style={{width: '22rem'}}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800">매핑 저장</h3>
+              <h3 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800">거래처 매핑 업데이트</h3>
               <button onClick={() => setShowSaveModal(false)} className="text-slate-500 hover:text-slate-300"><X size={16} /></button>
             </div>
 
-            {/* 모드 탭 — 불러온 프리셋이 있을 때만 표시 */}
-            {loadedPresetId && (
-              <div className="flex gap-1 p-1 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-100 mb-4">
-                <button
-                  onClick={() => setSaveMode('new')}
-                  className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors
-                    ${saveMode === 'new' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  새로 저장
-                </button>
-                <button
-                  onClick={() => setSaveMode('update')}
-                  className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors
-                    ${saveMode === 'update' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  기존 덮어쓰기
-                </button>
-              </div>
-            )}
-
             <p className="text-xs text-slate-500 mb-3">
-              {saveMode === 'update' && loadedPresetId
-                ? <span className="text-amber-400">불러온 프리셋에 현재 매핑을 덮어씁니다.</span>
-                : b2bFileData
-                  ? <span className="text-emerald-400">B2B 파일 + 매핑을 함께 저장합니다.</span>
-                  : '현재 매핑 설정을 저장합니다.'}
+              <span className="text-amber-400">불러온 거래처의 매핑을 현재 설정으로 업데이트합니다.</span>
               {b2bFileName && ` (${b2bFileName})`}
               {appendCount > 0 && ` · 추가 텍스트 ${appendCount}개 포함`}
             </p>
-
-            {/* 새로 저장 모드일 때만 이름 입력 */}
-            {(saveMode === 'new' || !loadedPresetId) && (
-              <input
-                autoFocus
-                type="text"
-                placeholder="예: 쿠팡 B2B, 네이버 주문"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="
-                  w-full px-3 py-2.5 rounded-xl text-sm mb-3
-                  bg-dark-hover dark:bg-dark-hover bg-gray-50
-                  border border-dark-border dark:border-dark-border border-gray-200
-                  text-slate-200 dark:text-slate-200 text-gray-800
-                  placeholder-slate-600
-                  focus:outline-none focus:ring-2 focus:ring-primary-500
-                "
-              />
-            )}
 
             <div className="flex gap-2">
               <button
@@ -254,10 +199,9 @@ export function ColumnMapper({
               >취소</button>
               <button
                 onClick={handleSave}
-                disabled={saveMode === 'new' && !saveName.trim()}
-                className="flex-[2] py-2 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 transition-colors"
+                className="flex-[2] py-2 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white transition-colors"
               >
-                {saveMode === 'update' && loadedPresetId ? '덮어쓰기' : '저장'}
+                업데이트
               </button>
             </div>
           </div>
@@ -286,10 +230,10 @@ export function ColumnMapper({
           )}
           <button
             onClick={handleAutoMatch}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20 hover:bg-primary-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20 hover:bg-primary-500/20 active:scale-95 transition-all leading-tight text-center"
           >
-            <Wand2 size={12} />
-            자동<br />매칭
+            <Wand2 size={12} className="shrink-0" />
+            <span className="whitespace-nowrap">자동<br />매칭</span>
           </button>
           <button
             onClick={handleOpenSaveModal}
@@ -309,49 +253,43 @@ export function ColumnMapper({
             `}
           >
             <BookOpen size={12} />
-            불러오기 {mappingPresets.filter(p => (p.mode ?? 'order') === mode).length > 0 && `(${mappingPresets.filter(p => (p.mode ?? 'order') === mode).length})`}
+            불러오기 {coupangPartners.length > 0 && `(${coupangPartners.length})`}
           </button>
         </div>
       </div>
 
-      {/* 저장된 프리셋 목록 */}
+      {/* 거래처 매핑 목록 */}
       {showPresets && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2 animate-fade-in">
-          <p className="text-xs font-medium text-amber-400 mb-2">저장된 매핑</p>
-          {mappingPresets.filter(p => (p.mode ?? 'order') === mode).length === 0 ? (
-            <p className="text-xs text-slate-500 py-2 text-center">저장된 매핑이 없습니다</p>
+          <p className="text-xs font-medium text-amber-400 mb-2">거래처 매핑</p>
+          {coupangPartners.length === 0 ? (
+            <p className="text-xs text-slate-500 py-2 text-center">거래처관리에서 거래처를 등록하세요</p>
           ) : (
-            mappingPresets.filter(p => (p.mode ?? 'order') === mode).map((preset) => (
+            coupangPartners.map((partner) => (
               <div
-                key={preset.id}
+                key={partner.id}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 hover:border-amber-500/30 transition-colors group"
               >
                 <button
-                  onClick={() => handleApplyPreset(preset.id, preset.mapping, preset.appendValues)}
+                  onClick={() => handleApplyPreset(partner.id, partner.mapping, partner.appendValues)}
                   className="flex-1 text-center"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <p className="text-sm font-medium text-slate-200 dark:text-slate-200 text-gray-800 group-hover:text-amber-300 transition-colors">
-                      {preset.name}
+                      {partner.partnerName}
                     </p>
+                    {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 border border-primary-500/30">{partner.prefix}</span>}
                     <span className="text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30 group-hover:bg-red-500/25 transition-colors whitespace-nowrap">
                       클릭 적용
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {preset.b2bFileName && `${preset.b2bFileName} · `}
-                    {Object.values(preset.mapping).filter(Boolean).length}개 매핑
-                    {preset.appendValues && Object.values(preset.appendValues).filter(Boolean).length > 0
-                      ? ` · 추가텍스트 ${Object.values(preset.appendValues).filter(Boolean).length}개`
+                    {partner.b2bFileName && `${partner.b2bFileName} · `}
+                    {Object.values(partner.mapping).filter(Boolean).length}개 매핑
+                    {partner.appendValues && Object.values(partner.appendValues).filter(Boolean).length > 0
+                      ? ` · 추가텍스트 ${Object.values(partner.appendValues).filter(Boolean).length}개`
                       : ''}
-                    {' · '}{new Date(preset.createdAt).toLocaleDateString('ko-KR')}
                   </p>
-                </button>
-                <button
-                  onClick={() => deletePreset(preset.id)}
-                  className="p-1.5 rounded-md text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
-                >
-                  <Trash2 size={13} />
                 </button>
               </div>
             ))
@@ -360,7 +298,16 @@ export function ColumnMapper({
       )}
 
       {/* 현황 */}
-      <div className="px-3 py-2 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 flex items-center gap-3">
+      <div className="px-3 py-2 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 flex items-center gap-3 flex-wrap">
+        {loadedPresetId && (() => {
+          const loaded = coupangPartners.find(p => p.id === loadedPresetId)
+          return loaded ? (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+              <CheckCircle2 size={10} />
+              {loaded.partnerName}
+            </span>
+          ) : null
+        })()}
         <span className="text-xs text-slate-400">
           매핑됨:{' '}
           <span className="text-primary-400 font-semibold">{mappedCount}</span>
@@ -417,23 +364,6 @@ export function ColumnMapper({
 
       {/* 매핑 테이블 */}
       <div className="rounded-xl border border-dark-border dark:border-dark-border border-gray-200 overflow-hidden">
-        {/* 핵심 컬럼 토글 (order/invoice 공통) */}
-        {coreHeaders.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-2 bg-amber-500/5 border-b border-amber-500/15">
-            <span className="text-xs text-amber-400/70">
-              핵심 컬럼: {coreHeaders.join(' · ')}
-            </span>
-            <button
-              onClick={() => setCoreOnly(!coreOnly)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
-                ${coreOnly
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-dark-hover text-slate-400 border-slate-700 hover:text-amber-300 hover:border-amber-500/30'}`}
-            >
-              {coreOnly ? '✦ 핵심 컬럼만 보는 중' : '핵심 컬럼만 보기'}
-            </button>
-          </div>
-        )}
         <div className="max-h-[420px] overflow-y-auto">
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10 bg-dark-surface dark:bg-dark-surface bg-gray-50">
@@ -445,8 +375,8 @@ export function ColumnMapper({
                 </th>
                 <th className="px-1 py-2.5 text-center border-b border-dark-border dark:border-dark-border border-gray-200 w-[5%]" />
                 <th className="px-3 py-2.5 text-left border-b border-dark-border dark:border-dark-border border-gray-200 w-[37%]">
-                  <div className="flex items-center justify-between">
-                    <span style={{ fontSize: '1.1em' }} className="font-medium text-amber-400/80">
+                  <div className="flex items-center justify-between gap-2">
+                    <span style={{ fontSize: '1.1em' }} className="font-medium text-amber-400/80 whitespace-nowrap">
                       {mode === 'invoice' ? 'B2B 송장 컬럼' : '마켓 주문 컬럼'}
                     </span>
                     <button
@@ -456,7 +386,7 @@ export function ColumnMapper({
                         onMappingChange(cleared)
                       }}
                       style={{ fontSize: '0.8em' }}
-                      className="text-slate-500 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded border border-slate-700 hover:border-red-500/40"
+                      className="text-slate-500 hover:text-red-400 transition-colors px-1.5 py-0.5 rounded border border-slate-700 hover:border-red-500/40 whitespace-nowrap leading-tight text-center shrink-0"
                       title="모든 컬럼을 비워두기로 초기화"
                     >
                       비워두기<br />모두적용
@@ -476,23 +406,13 @@ export function ColumnMapper({
                 const hasAppend    = appendVal.trim() !== ''
                 const isMapped     = !!orderCol || hasAppend
                 // 핵심→나머지 구분선 (전체보기 시)
-                const isFirstNonCore = !coreOnly
-                  && idx === coreHeaders.length && nonCoreHeaders.length > 0
-
                 return (
                   <>
-                  {isFirstNonCore && (
-                    <tr key="__divider__">
-                      <td colSpan={4} className="px-4 py-1.5 text-[10px] text-slate-600 bg-dark-hover/30 border-y border-slate-700/40">
-                        나머지 컬럼 ({nonCoreHeaders.length}개)
-                      </td>
-                    </tr>
-                  )}
                   <tr
                     key={b2bCol}
                     className={`
                       border-b border-dark-border/50 dark:border-dark-border/50 border-gray-100
-                      ${isCoreCol(b2bCol) && mode === 'invoice' ? 'bg-amber-500/5' : idx % 2 !== 0 ? 'bg-dark-hover/20 dark:bg-dark-hover/20 bg-gray-50/60' : ''}
+                      ${idx % 2 !== 0 ? 'bg-dark-hover/20 dark:bg-dark-hover/20 bg-gray-50/60' : ''}
                     `}
                   >
                     {/* B2B 컬럼명 */}

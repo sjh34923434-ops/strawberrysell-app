@@ -1,6 +1,24 @@
 import * as XLSX from 'xlsx';
 import type { MatchedRow } from './matcher';
 import type { ExcelRow } from './excelReader';
+import type { FileNameDateFormat } from '../stores/settingsStore';
+
+export function buildExportFileName(baseName: string, enabled: boolean, format: FileNameDateFormat): string {
+  if (!enabled) return baseName
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const y  = now.getFullYear()
+  const mo = pad(now.getMonth() + 1)
+  const d  = pad(now.getDate())
+  const h  = pad(now.getHours())
+  const mi = pad(now.getMinutes())
+  const s  = pad(now.getSeconds())
+  const suffix =
+    format === 'YYYYMMDD'       ? `${y}${mo}${d}` :
+    format === 'YYYY-MM-DD'     ? `${y}-${mo}-${d}` :
+    /* YYYYMMDD_HHmmss */         `${y}${mo}${d}_${h}${mi}${s}`
+  return `${baseName}_${suffix}`
+}
 
 // ─── 타입 정의 ────────────────────────────────────────────────────────────────
 

@@ -300,7 +300,7 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
 
         setEntries(prev => [...prev, {
           id: `${Date.now()}-${Math.random()}`, file, data, ...detected,
-          expanded: !preset, // 프리셋 자동 적용이면 접은 상태, 처음이면 펼침
+          expanded: false, // 항상 닫힌 상태로 시작
           presetId, presetName,
         }])
       } catch (err) {
@@ -371,6 +371,9 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
       await new Promise(r => setTimeout(r, 0))
       // bilateral: supplierCol이 있는 쌍 (B2B 인덱스 조회용)
       // unilateral: supplierCol이 없는 쌍 (주문 고유 식별용 — 예: 옵션ID)
+      const VENDOR_CODE_RE = /업체상품코드/
+      const orderVendorCol = savedOrder.headers.find(h => VENDOR_CODE_RE.test(h)) ?? null
+
       const indexes = entries.map(entry => {
         const bilateral = entry.keyPairs.filter(p => p.supplierCol)
         const multiIdx = new Map<string, Record<string, unknown>[]>()
@@ -382,9 +385,14 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
             multiIdx.set(key, list)
           }
         }
-const assignCache  = new Map<string, Record<string, unknown>>()
+        const assignCache  = new Map<string, Record<string, unknown>>()
         const lastAssigned = new Map<string, Record<string, unknown>>()
-        return { bilateral, unilateral: entry.keyPairs.filter(p => !p.supplierCol), multiIdx, assignCache, lastAssigned }
+        // 업체상품코드 검증용: 거래처 파일에 있는 업체상품코드 값 Set
+        const supplierVendorCol = entry.data.headers.find(h => VENDOR_CODE_RE.test(h)) ?? null
+        const supplierVendorSet: Set<string> = supplierVendorCol
+          ? new Set((entry.data.rows as Record<string, unknown>[]).map(r => normalizeKeyVal(r[supplierVendorCol])).filter(v => v !== ''))
+          : new Set()
+        return { bilateral, unilateral: entry.keyPairs.filter(p => !p.supplierCol), multiIdx, assignCache, lastAssigned, supplierVendorSet }
       })
 
       const splitDeliveryCols = savedOrder.headers.filter(h => /분리배송.*[YyNn\/]|분리\s*배송\s*y/i.test(h))
@@ -436,9 +444,15 @@ const assignCache  = new Map<string, Record<string, unknown>>()
         }
 
         // Phase 2: 모든 파일에서 새 행 없음 → lastAssigned 폴백 (B2B 1행인데 주문 2행인 경우)
+        // 단, 거래처 파일에 업체상품코드가 있고 주문 행의 업체상품코드가 그 Set에 없으면 폴백 차단
         if (matchedRow === undefined) {
           for (let ei = 0; ei < entries.length && matchedRow === undefined; ei++) {
-            const { bilateral, unilateral, lastAssigned, assignCache } = indexes[ei]
+            const { bilateral, unilateral, lastAssigned, assignCache, supplierVendorSet } = indexes[ei]
+            // 업체상품코드 교차 검증
+            if (supplierVendorSet.size > 0 && orderVendorCol) {
+              const orderVendorVal = normalizeKeyVal(orderRow[orderVendorCol])
+              if (orderVendorVal && !supplierVendorSet.has(orderVendorVal)) continue
+            }
             const baseKey = makeCompositeKey(orderRow, bilateral.map(p => p.orderCol))
             const fallback = lastAssigned.get(baseKey)
             if (fallback) {
@@ -779,14 +793,14 @@ const assignCache  = new Map<string, Record<string, unknown>>()
         {/* 파일 추가 드롭존 */}
         <label onDrop={handleDrop} onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)}
           className={`flex items-center justify-center gap-2.5 px-4 py-4 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200
-            ${isDragging ? 'border-amber-400 bg-amber-500/10 scale-[1.01]' : 'border-dark-border hover:border-amber-500/40 hover:bg-dark-hover/60'}`}>
+            ${isDragging ? 'border-cyan-400 bg-cyan-500/[0.20] scale-[1.01]' : 'border-cyan-500/40 bg-cyan-500/[0.20] hover:border-cyan-400 hover:bg-cyan-500/[0.45]'}`}>
           <div className={`p-2 rounded-full ${isDragging ? 'bg-amber-500/20' : 'bg-dark-hover'}`}>
             <Upload size={16} className={isDragging ? 'text-amber-400' : 'text-slate-500'} />
           </div>
           <div>
-            <p className="text-sm text-slate-400">
-              {entries.length === 0 ? '거래처 파일을 드래그하거나 ' : '+ 파일 추가 — '}
-              <span className="text-amber-400">클릭하여 선택</span>
+            <p className="text-sm font-medium text-red-400">
+              {entries.length === 0 ? '+ 파일 추가 — ' : '+ 파일 추가 — '}
+              <span className="underline underline-offset-2">클릭하여 선택</span>
             </p>
             <p className="text-xs text-slate-600 mt-0.5">여러 파일 동시 선택 가능 · xlsx, xls, csv</p>
           </div>

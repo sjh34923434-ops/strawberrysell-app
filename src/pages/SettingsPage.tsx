@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2 } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText } from 'lucide-react'
 import { useLicenseStore } from '../stores/licenseStore'
-import { useSettingsStore } from '../stores/settingsStore'
+import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
 
 function Section({ title, icon: Icon, children }: {
@@ -28,9 +28,12 @@ export function SettingsPage() {
   const { user }                        = useAuthStore()
   const { licenseKey, isActivated, expiresAt, isLoading, error, activate, clearError } = useLicenseStore()
   const {
-    matchingSettings, updateMatchingSettings, fontSize, setFontSize, mappingPresets,
+    matchingSettings, updateMatchingSettings, fontSize, setFontSize,
+    coupangPartners,
     savedOrders, deleteSavedOrder,
     supplierMappingPresets, deleteSupplierMappingPreset,
+    fileNameDateEnabled, fileNameDateFormat,
+    setFileNameDateEnabled, setFileNameDateFormat,
   } = useSettingsStore()
 
   const [newLicenseKey, setNewLicenseKey] = useState('')
@@ -49,8 +52,8 @@ export function SettingsPage() {
         return
       }
       const parsed = JSON.parse(seedJson)
-      const seedPresets = parsed?.state?.mappingPresets ?? []
-      if (seedPresets.length === 0) {
+      const seedPartners = parsed?.state?.coupangPartners ?? []
+      if (seedPartners.length === 0) {
         setRestoreStatus('none')
         return
       }
@@ -128,6 +131,78 @@ export function SettingsPage() {
               ))}
             </div>
           </div>
+        </Section>
+
+        {/* 내보내기 파일명 설정 */}
+        <Section title="내보내기 파일명 설정" icon={FileText}>
+          {(() => {
+            const now = new Date()
+            const pad = (n: number) => String(n).padStart(2, '0')
+            const y = now.getFullYear()
+            const mo = pad(now.getMonth() + 1)
+            const d = pad(now.getDate())
+            const h = pad(now.getHours())
+            const mi = pad(now.getMinutes())
+            const s = pad(now.getSeconds())
+            const suffix =
+              fileNameDateFormat === 'YYYYMMDD'       ? `${y}${mo}${d}` :
+              fileNameDateFormat === 'YYYY-MM-DD'     ? `${y}-${mo}-${d}` :
+              `${y}${mo}${d}_${h}${mi}${s}`
+            const preview = fileNameDateEnabled ? `거래처명_${suffix}.xlsx` : '거래처명.xlsx'
+            return (
+              <div className="space-y-4">
+                {/* 날짜 추가 토글 */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">파일명에 날짜/시간 자동 추가</p>
+                    <p className="text-xs text-slate-500 mt-0.5">B2B 사이트 업로드 시 파일명 중복 방지</p>
+                  </div>
+                  <button
+                    onClick={() => setFileNameDateEnabled(!fileNameDateEnabled)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${fileNameDateEnabled ? 'bg-primary-500' : 'bg-dark-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${fileNameDateEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {/* 포맷 선택 */}
+                {fileNameDateEnabled && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-400">날짜 포맷</p>
+                    <div className="space-y-1.5">
+                      {([
+                        { value: 'YYYYMMDD_HHmmss', label: 'YYYYMMDD_HHmmss', desc: '날짜 + 시간 (권장)' },
+                        { value: 'YYYYMMDD',        label: 'YYYYMMDD',        desc: '날짜만' },
+                        { value: 'YYYY-MM-DD',      label: 'YYYY-MM-DD',      desc: '날짜만 (구분자 포함)' },
+                      ] as { value: FileNameDateFormat; label: string; desc: string }[]).map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setFileNameDateFormat(opt.value)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                            fileNameDateFormat === opt.value
+                              ? 'bg-primary-500/10 border-primary-500/40 text-primary-300'
+                              : 'bg-dark-hover border-dark-border text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${fileNameDateFormat === opt.value ? 'border-primary-400 bg-primary-400' : 'border-slate-600'}`} />
+                          <div>
+                            <span className="text-xs font-mono font-semibold">{opt.label}</span>
+                            <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 미리보기 */}
+                <div className="px-3 py-2.5 rounded-xl bg-dark-hover border border-dark-border">
+                  <p className="text-xs text-slate-500 mb-1">파일명 미리보기</p>
+                  <p className="text-sm font-mono text-primary-300">{preview}</p>
+                </div>
+              </div>
+            )
+          })()}
         </Section>
 
         {/* 계정 정보 */}
@@ -338,7 +413,7 @@ export function SettingsPage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-xs text-slate-500">
-                현재 프리셋: <span className="text-primary-400 font-semibold">{mappingPresets.length}개</span>
+                등록 거래처: <span className="text-primary-400 font-semibold">{coupangPartners.length}개</span>
               </div>
             </div>
 

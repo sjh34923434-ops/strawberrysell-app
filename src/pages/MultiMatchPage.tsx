@@ -9,8 +9,8 @@ import { FileUploader } from '../components/FileUploader'
 import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { readExcelFile, type ParsedExcel } from '../utils/excelReader'
 import { runMultiMatch, getUniqueValuesWithCount, type PartnerMatchResult } from '../utils/multiMatcher'
-import { downloadFilledB2b } from '../utils/excelWriter'
-import { useSettingsStore, type PartnerRule, type MappingPreset } from '../stores/settingsStore'
+import { downloadFilledB2b, buildExportFileName } from '../utils/excelWriter'
+import { useSettingsStore, type PartnerRule, type CoupangPartner } from '../stores/settingsStore'
 import type { ColumnMapping } from '../utils/fillMapper'
 
 // ─── 상수 ──────────────────────────────────────────────────────────────────────
@@ -189,10 +189,10 @@ export function MultiMatchPage() {
   const [showValuePicker, setShowValuePicker] = useState<string | null>(null)
 
   const {
-    mappingPresets,
     coupangPartners,
     multiMatchConfigs, saveMultiMatchConfig, deleteMultiMatchConfig,
     saveOrder,
+    fileNameDateEnabled, fileNameDateFormat,
   } = useSettingsStore()
 
   // ─── 파생 데이터 ─────────────────────────────────────────────────────────────
@@ -225,6 +225,9 @@ export function MultiMatchPage() {
     try {
       const parsed = await readExcelFile(file)
       setOrderData(parsed)
+      // 업체상품코드가 있으면 자동 선택
+      const autoCol = parsed.headers.find(h => /업체상품코드/i.test(h))
+      if (autoCol) setClassifyColumn(autoCol)
       saveOrder('multi-match', parsed.headers, parsed.rows as Record<string, unknown>[])
     } catch (err) {
       setError(err instanceof Error ? err.message : '주문 파일을 읽는 중 오류가 발생했습니다.')
@@ -235,34 +238,17 @@ export function MultiMatchPage() {
   // ─── 접두어 자동 분류 ──────────────────────────────────────────────────────────
 
   const handleAutoClassify = async () => {
-    if (!orderData || !classifyColumn || coupangPartners.length === 0) return
+    if (!orderData || !classifyColumn || coupangPartners.length === 0) {
+      return
+    }
     const currentVals = new Set(uniqueValues.map(v => v.value))
     const loaded: LocalPartner[] = []
 
     for (const cp of coupangPartners) {
-      let matched: string[] = []
-
-      // ① 저장된 마켓 주문 샘플 파일에서 classifyColumn 값 추출 → 현재 주문과 교집합
-      if (cp.marketFileData) {
-        try {
-          const file   = base64ToFile(cp.marketFileData, cp.marketFileName ?? '마켓주문.xlsx')
-          const parsed = await readExcelFile(file)
-          // 같은 컬럼명 먼저, 없으면 업체상품코드 패턴으로 찾기
-          const col = parsed.headers.find(h => h === classifyColumn)
-            ?? parsed.headers.find(h => /업체상품코드/i.test(h))
-          if (col) {
-            const sampleVals = new Set(
-              parsed.rows.map(r => String(r[col] ?? '').trim()).filter(Boolean)
-            )
-            matched = [...currentVals].filter(v => sampleVals.has(v))
-          }
-        } catch { /* ignore */ }
-      }
-
-      // ② 샘플 파일이 없거나 매칭 못 찾으면 접두어로 fallback
-      if (matched.length === 0 && cp.prefix) {
-        matched = [...currentVals].filter(v => v.startsWith(cp.prefix))
-      }
+      const rawPrefix = (cp.prefix || cp.partnerName).trim()
+      if (!rawPrefix) continue
+      const prefixKey = rawPrefix.slice(0, 2)
+      const matched = [...currentVals].filter(v => v.slice(0, 2) === prefixKey)
 
       if (matched.length === 0) continue
 
@@ -278,10 +264,10 @@ export function MultiMatchPage() {
       loaded.push({
         id:              Date.now().toString() + Math.random().toString(36).slice(2),
         partnerName:     cp.partnerName,
-        b2bTemplateId:   '',
+        b2bTemplateId:   cp.id,
         b2bHeaders:      headers,
         b2bFileName:     cp.b2bFileName?.replace(/\.[^/.]+$/, ''),
-        mappingPresetId: '',
+        mappingPresetId: cp.id,
         mapping:         cp.mapping,
         appendValues:    cp.appendValues,
         matchValues:     matched,
@@ -292,9 +278,8 @@ export function MultiMatchPage() {
 
     if (loaded.length === 0) return
     setPartners(loaded)
-    setStep(2)
 
-    // 분류 완료 후 바로 매칭 실행 (state 업데이트 대기 없이 loaded 직접 사용)
+    // 분류 완료 후 바로 매칭 실행 → step 3 결과로 직행
     setIsProcessing(true)
     setError(null)
     try {
@@ -349,36 +334,25 @@ export function MultiMatchPage() {
   const updatePartner = (id: string, patch: Partial<LocalPartner>) =>
     setPartners(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
 
-  const selectTemplate = async (partnerId: string, presetId: string) => {
-    if (!presetId) { updatePartner(partnerId, { b2bTemplateId: '', b2bHeaders: [], mappingPresetId: '', mapping: {}, appendValues: {} }); return }
-    const preset = mappingPresets.find(p => p.id === presetId && p.b2bFileData)
-    if (!preset) return
-    updatePartner(partnerId, { b2bTemplateId: presetId, loadingTemplate: true })
+  const selectTemplate = async (localPartnerId: string, cpId: string) => {
+    if (!cpId) { updatePartner(localPartnerId, { b2bTemplateId: '', b2bHeaders: [], mappingPresetId: '', mapping: {}, appendValues: {} }); return }
+    const cp = coupangPartners.find(p => p.id === cpId && p.b2bFileData)
+    if (!cp) return
+    updatePartner(localPartnerId, { b2bTemplateId: cpId, loadingTemplate: true })
     try {
-      const file   = base64ToFile(preset.b2bFileData!, preset.b2bFileName ?? 'B2B양식.xlsx')
+      const file   = base64ToFile(cp.b2bFileData!, cp.b2bFileName ?? 'B2B양식.xlsx')
       const parsed = await readExcelFile(file)
-      updatePartner(partnerId, {
+      updatePartner(localPartnerId, {
         b2bHeaders:      parsed.headers,
         loadingTemplate: false,
-        mappingPresetId: presetId,
-        mapping:         preset.mapping,
-        appendValues:    preset.appendValues ?? {},
+        mappingPresetId: cpId,
+        mapping:         cp.mapping,
+        appendValues:    cp.appendValues ?? {},
       })
     } catch {
-      updatePartner(partnerId, { b2bTemplateId: '', b2bHeaders: [], loadingTemplate: false })
+      updatePartner(localPartnerId, { b2bTemplateId: '', b2bHeaders: [], loadingTemplate: false })
       setError('B2B 양식 파일을 불러오는 중 오류가 발생했습니다.')
     }
-  }
-
-  const selectPreset = (partnerId: string, presetId: string) => {
-    if (!presetId) { updatePartner(partnerId, { mappingPresetId: '', mapping: {}, appendValues: {} }); return }
-    const preset = mappingPresets.find(m => m.id === presetId)
-    if (!preset) return
-    updatePartner(partnerId, {
-      mappingPresetId: presetId,
-      mapping:         preset.mapping,
-      appendValues:    preset.appendValues ?? {},
-    })
   }
 
   const toggleMatchValue = (partnerId: string, value: string) => {
@@ -397,8 +371,7 @@ export function MultiMatchPage() {
       id:              p.id,
       partnerName:     p.partnerName,
       matchValues:     p.matchValues,
-      b2bTemplateId:   p.b2bTemplateId,
-      mappingPresetId: p.mappingPresetId,
+      partnerId:       p.b2bTemplateId,
     }))
     saveMultiMatchConfig(saveName.trim(), classifyColumn, rules)
     setSaveName('')
@@ -411,12 +384,11 @@ export function MultiMatchPage() {
     setClassifyColumn(cfg.classifyColumn)
     const loaded: LocalPartner[] = []
     for (const rule of cfg.rules) {
-      const tpl    = mappingPresets.find(p => p.id === rule.b2bTemplateId && p.b2bFileData)
-      const preset = mappingPresets.find(m => m.id === rule.mappingPresetId)
+      const cp = coupangPartners.find(p => p.id === rule.partnerId && p.b2bFileData)
       let headers: string[] = []
-      if (tpl) {
+      if (cp) {
         try {
-          const file   = base64ToFile(tpl.b2bFileData!, tpl.b2bFileName ?? 'B2B양식.xlsx')
+          const file   = base64ToFile(cp.b2bFileData!, cp.b2bFileName ?? 'B2B양식.xlsx')
           const parsed = await readExcelFile(file)
           headers = parsed.headers
         } catch { /* ignore */ }
@@ -424,11 +396,11 @@ export function MultiMatchPage() {
       loaded.push({
         id:              rule.id,
         partnerName:     rule.partnerName,
-        b2bTemplateId:   rule.b2bTemplateId,
+        b2bTemplateId:   rule.partnerId,
         b2bHeaders:      headers,
-        mappingPresetId: rule.mappingPresetId,
-        mapping:         preset?.mapping ?? {},
-        appendValues:    preset?.appendValues ?? {},
+        mappingPresetId: rule.partnerId,
+        mapping:         cp?.mapping ?? {},
+        appendValues:    cp?.appendValues ?? {},
         matchValues:     rule.matchValues,
         loadingTemplate: false,
         expanded:        false,
@@ -460,7 +432,7 @@ export function MultiMatchPage() {
                 b2bHeaders:   p.b2bHeaders,
                 mapping:      p.mapping,
                 appendValues: p.appendValues,
-                b2bFileName:  p.b2bFileName ?? mappingPresets.find(m => m.id === p.b2bTemplateId)?.b2bFileName?.replace(/\.[^/.]+$/, ''),
+                b2bFileName:  p.b2bFileName ?? coupangPartners.find(m => m.id === p.b2bTemplateId)?.b2bFileName?.replace(/\.[^/.]+$/, ''),
               })),
             ))
           } catch (e) { reject(e) }
@@ -485,12 +457,14 @@ export function MultiMatchPage() {
   // ─── 다운로드 ─────────────────────────────────────────────────────────────────
 
   const handleDownload = (result: PartnerMatchResult) => {
-    downloadFilledB2b(result.rows, result.b2bFileName ?? result.partnerName)
+    const name = buildExportFileName(result.b2bFileName ?? result.partnerName, fileNameDateEnabled, fileNameDateFormat)
+    downloadFilledB2b(result.rows, name)
   }
 
   const handleDownloadAll = () => {
     results?.forEach((r, i) => {
-      setTimeout(() => downloadFilledB2b(r.rows, r.b2bFileName ?? r.partnerName), i * 300)
+      const name = buildExportFileName(r.b2bFileName ?? r.partnerName, fileNameDateEnabled, fileNameDateFormat)
+      setTimeout(() => downloadFilledB2b(r.rows, name), i * 300)
     })
   }
 
@@ -547,7 +521,7 @@ export function MultiMatchPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-100 dark:text-slate-100 text-gray-900 flex items-center gap-3 flex-wrap">
               일괄 매칭
-              <span className="text-sm font-semibold text-red-400">꼭! 주문매칭에서 컬럼매핑을 저장하신 후 시작해주세요! 그래야 저장데이터가 나타납니다!</span>
+              <span className="text-sm font-semibold text-red-400">거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해야 적용됩니다.</span>
             </h1>
             <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500 mt-1">
               하나의 주문 파일을 여러 거래처 B2B 양식으로 분류 출력
@@ -634,10 +608,18 @@ export function MultiMatchPage() {
 
             <button
               disabled={!orderData || !classifyColumn}
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setPartners([])
+                setResults(null)
+                if (coupangPartners.length > 0) {
+                  handleAutoClassify()
+                } else {
+                  setStep(2)
+                }
+              }}
               className="w-full py-2.5 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20"
             >
-              다음: 파트너 설정 →
+              {coupangPartners.length > 0 ? '매칭 실행 →' : '다음: 파트너 설정 →'}
             </button>
             <button
               onClick={() => navigate('/dashboard')}
@@ -716,14 +698,13 @@ export function MultiMatchPage() {
                 index={idx}
                 uniqueValues={uniqueValues}
                 assignedValues={assignedValues}
-                mappingPresets={mappingPresets}
+                coupangPartners={coupangPartners}
                 showValuePicker={showValuePicker === p.id}
                 onToggleExpand={() => updatePartner(p.id, { expanded: !p.expanded })}
                 onToggleValuePicker={() => setShowValuePicker(showValuePicker === p.id ? null : p.id)}
                 onRemove={() => removePartner(p.id)}
                 onNameChange={(name) => updatePartner(p.id, { partnerName: name })}
                 onSelectTemplate={(tplId) => selectTemplate(p.id, tplId)}
-                onSelectPreset={(presetId) => selectPreset(p.id, presetId)}
                 onToggleMatchValue={(val) => toggleMatchValue(p.id, val)}
               />
             ))}
@@ -798,10 +779,10 @@ export function MultiMatchPage() {
             </div>
 
             <button
-              onClick={() => setStep(2)}
+              onClick={() => { setStep(1); setPartners([]); setResults(null) }}
               className="w-full py-2.5 rounded-xl text-sm font-medium bg-dark-hover dark:bg-dark-hover bg-gray-100 border border-dark-border dark:border-dark-border border-gray-200 text-slate-300 dark:text-slate-300 text-gray-700 hover:bg-dark-muted transition-all"
             >
-              ← 이전 (파트너 설정으로)
+              ← 이전 (파일 업로드로)
             </button>
           </div>
         )}
@@ -845,24 +826,23 @@ interface PartnerCardProps {
   index:             number
   uniqueValues:      { value: string; count: number }[]
   assignedValues:    Set<string>
-  mappingPresets:    MappingPreset[]
+  coupangPartners:   CoupangPartner[]
   showValuePicker:   boolean
   onToggleExpand:    () => void
   onToggleValuePicker: () => void
   onRemove:          () => void
   onNameChange:      (name: string) => void
   onSelectTemplate:  (id: string) => void
-  onSelectPreset:    (id: string) => void
   onToggleMatchValue:(val: string) => void
 }
 
 function PartnerCard({
   partner, index, uniqueValues, assignedValues,
-  mappingPresets,
+  coupangPartners,
   showValuePicker, onToggleExpand, onToggleValuePicker,
-  onRemove, onNameChange, onSelectTemplate, onSelectPreset, onToggleMatchValue,
+  onRemove, onNameChange, onSelectTemplate, onToggleMatchValue,
 }: PartnerCardProps) {
-  const unifiedPresets = mappingPresets.filter(p => p.b2bFileData)
+  const availablePartners = coupangPartners.filter(p => p.b2bFileData)
 
   const isComplete = partner.partnerName && partner.b2bHeaders.length > 0
     && partner.mappingPresetId && partner.matchValues.length > 0
@@ -888,7 +868,7 @@ function PartnerCard({
           </p>
           {isComplete && (
             <p className="text-xs text-slate-500 truncate">
-              분류값 {partner.matchValues.length}개 · {unifiedPresets.find(p => p.id === partner.b2bTemplateId)?.name}
+              분류값 {partner.matchValues.length}개 · {availablePartners.find(p => p.id === partner.b2bTemplateId)?.partnerName}
             </p>
           )}
         </div>
@@ -920,37 +900,21 @@ function PartnerCard({
               />
             </div>
 
-            {/* B2B 양식 + 매핑 프리셋 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">B2B 양식</label>
-                <select
-                  value={partner.b2bTemplateId}
-                  onChange={e => onSelectTemplate(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-lg text-xs bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 text-slate-200 dark:text-slate-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none cursor-pointer"
-                >
-                  <option value="">— 선택 —</option>
-                  {unifiedPresets.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {partner.loadingTemplate && <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1"><Loader2 size={9} className="animate-spin" /> 로딩 중...</p>}
-                {partner.b2bHeaders.length > 0 && <p className="text-[10px] text-emerald-400 mt-0.5">컬럼 {partner.b2bHeaders.length}개 로드됨</p>}
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">매핑 설정</label>
-                <select
-                  value={partner.mappingPresetId}
-                  onChange={e => onSelectPreset(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-lg text-xs bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 text-slate-200 dark:text-slate-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none cursor-pointer"
-                >
-                  <option value="">— 선택 —</option>
-                  {mappingPresets.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-                {partner.mappingPresetId && <p className="text-[10px] text-emerald-400 mt-0.5">매핑 {Object.values(partner.mapping).filter(Boolean).length}개 적용</p>}
-              </div>
+            {/* 거래처 선택 (B2B 양식 + 매핑 통합) */}
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">거래처 (B2B 양식 + 매핑)</label>
+              <select
+                value={partner.b2bTemplateId}
+                onChange={e => onSelectTemplate(e.target.value)}
+                className="w-full px-2.5 py-2 rounded-lg text-xs bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 text-slate-200 dark:text-slate-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none cursor-pointer"
+              >
+                <option value="">— 거래처 선택 —</option>
+                {availablePartners.map(p => (
+                  <option key={p.id} value={p.id}>{p.partnerName}{p.prefix ? ` (${p.prefix})` : ''}</option>
+                ))}
+              </select>
+              {partner.loadingTemplate && <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1"><Loader2 size={9} className="animate-spin" /> 로딩 중...</p>}
+              {partner.b2bHeaders.length > 0 && <p className="text-[10px] text-emerald-400 mt-0.5">컬럼 {partner.b2bHeaders.length}개 · 매핑 {Object.values(partner.mapping).filter(Boolean).length}개 적용</p>}
             </div>
 
             {/* 분류 값 선택 */}

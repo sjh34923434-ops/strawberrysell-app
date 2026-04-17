@@ -365,7 +365,7 @@ export function B2bPartnersPage() {
             {tab === 'b2b' ? (
               <>
                 <span className="font-semibold text-primary-400">B2B 주문 양식</span>은 거래처(도매처)에 보내는 발주서예요.
-                접두어를 등록하면 업체상품코드 기준으로 <span className="text-slate-300">자동 분류</span>됩니다.
+                <span className="text-red-400">접두어</span>를 등록하면 <span className="text-red-400">업체상품코드</span> 기준으로 <span className="text-slate-300">자동 분류</span>됩니다.
               </>
             ) : tab === 'invoice' ? (
               <>
@@ -462,7 +462,7 @@ export function B2bPartnersPage() {
                   거래처 배송목록 파일 (운송장번호 포함)
                   {sEditingId && !sForm.file && <span className="text-slate-600 font-normal">(새 파일 업로드 시 교체)</span>}
                 </label>
-                <FileUploader label="" file={sForm.file} onFileChange={handleSupplierFile} />
+                <FileUploader label="" file={sForm.file} onFileChange={handleSupplierFile} compact />
                 {sForm.headers.length > 0 && (
                   <p className="text-xs text-amber-400/70">컬럼 {sForm.headers.length}개 인식</p>
                 )}
@@ -615,8 +615,8 @@ export function B2bPartnersPage() {
             <div className="rounded-2xl border border-dark-border bg-dark-card p-5 space-y-4">
               <div className={`grid gap-4 ${isB2b ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-400">
-                    {isB2b ? '거래처명' : '마켓명'}
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 h-4">
+                    <Store size={11} /> {isB2b ? '거래처명' : '마켓명'}
                   </label>
                   <input
                     type="text"
@@ -628,8 +628,8 @@ export function B2bPartnersPage() {
                 </div>
                 {isB2b && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                      <Tag size={11} /> 접두어 (업체상품코드 앞글자)
+                    <label className="text-xs font-medium flex items-center gap-1.5 h-4">
+                      <Tag size={11} /><span className="text-slate-300 font-semibold">접두어 매칭 </span><span className="text-red-400">업체상품코드 앞 두 글자 반드시 동일</span>
                     </label>
                     <input
                       type="text" placeholder="예: DA, SB, KT"
@@ -658,7 +658,7 @@ export function B2bPartnersPage() {
                         <span className="text-slate-500 ml-1">(새 파일 업로드 시 교체)</span>
                       </div>
                     ) : null}
-                    <FileUploader label="" file={form.marketFile} onFileChange={handleMarketFile} />
+                    <FileUploader label="" file={form.marketFile} onFileChange={handleMarketFile} compact />
                     {form.marketHeaders.length > 0 && (
                       <p className="text-xs text-amber-400/70">
                         컬럼 {form.marketHeaders.length}개 인식 — 이 컬럼이 매핑 왼쪽(마켓 주문 컬럼)으로 사용됩니다
@@ -681,7 +681,7 @@ export function B2bPartnersPage() {
                 <label className="text-xs font-medium text-slate-400">
                   {isB2b ? 'B2B 발주서 엑셀 파일' : '마켓 송장등록 엑셀 양식'}
                 </label>
-                <FileUploader label="" file={form.b2bFile} onFileChange={handleFile} />
+                <FileUploader label="" file={form.b2bFile} onFileChange={handleFile} compact />
               </div>
             </div>
 

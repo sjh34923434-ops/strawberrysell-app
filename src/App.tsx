@@ -114,9 +114,9 @@ export default function App() {
         if (seedJson) {
           const current = localStorage.getItem('strawberrysell-settings')
           const currentParsed = current ? JSON.parse(current) : null
-          const seedPresets = JSON.parse(seedJson)?.state?.mappingPresets?.length ?? 0
-          const currentPresets = currentParsed?.state?.mappingPresets?.length ?? 0
-          if (seedPresets > currentPresets) {
+          const seedPartners = JSON.parse(seedJson)?.state?.coupangPartners?.length ?? 0
+          const currentPartners = currentParsed?.state?.coupangPartners?.length ?? 0
+          if (seedPartners > currentPartners) {
             localStorage.setItem('strawberrysell-settings', seedJson)
             window.location.reload()
             return

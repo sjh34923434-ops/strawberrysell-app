@@ -40,9 +40,9 @@ const NAV_ITEMS = [
     },
   },
   {
-    to: '/b2b-partners', icon: Database, label: '거래처 B2B',
+    to: '/b2b-partners', icon: Database, label: '거래처관리',
     tip: {
-      title: '거래처 B2B 관리',
+      title: '거래처관리',
       rows: [
         { label: '용도',   value: 'B2B 양식 파일과 컬럼 매핑을 1회 등록' },
         { label: '효과',   value: '쿠팡·일괄·주문매칭 전부 자동 적용' },

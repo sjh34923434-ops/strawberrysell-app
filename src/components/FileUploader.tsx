@@ -8,6 +8,7 @@ interface Props {
   onFileChange:(file: File | null) => void
   className?:  string
   tall?:       boolean
+  compact?:    boolean
 }
 
 export function FileUploader({
@@ -17,6 +18,7 @@ export function FileUploader({
   onFileChange,
   className = '',
   tall = false,
+  compact = false,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false)
 
@@ -87,11 +89,11 @@ export function FileUploader({
           className={`
             flex flex-col items-center justify-center gap-3
             px-6 rounded-xl border-2 border-dashed cursor-pointer
-            ${tall ? 'py-14' : 'py-8'}
+            ${tall ? 'py-14' : compact ? 'py-2' : 'py-8'}
             transition-all duration-200
             ${isDragging
-              ? 'border-primary-400 bg-primary-500/10 scale-[1.01]'
-              : 'border-dark-border dark:border-dark-border border-gray-300 hover:border-primary-500/50 hover:bg-dark-hover dark:hover:bg-dark-hover hover:bg-gray-50'
+              ? 'border-cyan-400 bg-cyan-500/[0.20] scale-[1.01]'
+              : 'border-cyan-500/40 bg-cyan-500/[0.20] hover:border-cyan-400 hover:bg-cyan-500/[0.45]'
             }
           `}
         >
@@ -102,9 +104,8 @@ export function FileUploader({
             <Upload size={22} className={isDragging ? 'text-primary-400' : 'text-slate-400 dark:text-slate-400 text-gray-500'} />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">
-              파일을 드래그하거나{' '}
-              <span className="text-primary-400 underline underline-offset-2">클릭하여 선택</span>
+            <p className="text-sm font-medium text-red-400">
+              + 파일 추가 — <span className="underline underline-offset-2">클릭하여 선택</span>
             </p>
             <p className="text-xs text-slate-500 mt-1">xlsx, xls, csv 지원</p>
           </div>
