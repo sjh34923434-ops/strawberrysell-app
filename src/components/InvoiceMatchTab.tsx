@@ -3,7 +3,7 @@ import {
   FileSpreadsheet, Truck, Play, Loader2, CheckCircle2, AlertCircle,
   RotateCcw, Plus, X, ChevronDown, ChevronUp, Upload, Save, Zap, BookMarked, Download,
 } from 'lucide-react'
-import { useSettingsStore, type SavedOrderSource } from '../stores/settingsStore'
+import { useSettingsStore, type SavedOrderSource, type MarketType } from '../stores/settingsStore'
 import { useBusinessStore } from '../stores/businessStore'
 import { coupangApi } from '../api/client'
 import { Send } from 'lucide-react'
@@ -30,7 +30,8 @@ const COUPANG_CARRIER_MAP: Record<string, string> = {
 }
 
 interface InvoiceMatchTabProps {
-  source: SavedOrderSource
+  source:      SavedOrderSource
+  marketType?: MarketType
 }
 
 const SOURCE_LABEL: Record<SavedOrderSource, string> = {
@@ -101,7 +102,7 @@ const fmtSize = (b: number) =>
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────────────────────
 
-export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
+export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
   const {
     savedOrders,
     saveOrder,
@@ -272,7 +273,7 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
         const rows = data.rows as Record<string, unknown>[]
 
         // 프리셋 자동 매칭
-        const preset = findSupplierMappingPreset(data.headers)
+        const preset = findSupplierMappingPreset(data.headers, marketType)
         let detected: { keyPairs: KeyPair[]; invoiceCol: string; carrierCol: string }
         let presetId: string | undefined
         let presetName: string | undefined
@@ -345,7 +346,7 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
   const handleSavePreset = (entryId: string, name: string) => {
     const entry = entries.find(e => e.id === entryId)
     if (!entry || !name.trim()) return
-    const saved = saveSupplierMappingPreset(name.trim(), entry.data.headers, entry.keyPairs, entry.invoiceCol, entry.carrierCol)
+    const saved = saveSupplierMappingPreset(name.trim(), entry.data.headers, entry.keyPairs, entry.invoiceCol, entry.carrierCol, marketType)
     updateEntry(entryId, { presetId: saved.id, presetName: saved.name })
     setSaveModal(null)
     setSavedFeedback(`"${saved.name}" 저장 완료!`)
@@ -580,7 +581,7 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
       {/* STEP 1: 주문 파일 업로드 또는 저장된 주문 선택 */}
       <div className="rounded-2xl border border-amber-500/30 bg-dark-card p-5 space-y-3">
         <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-          <FileSpreadsheet size={14} className="text-amber-400" /> 주문 파일
+          <FileSpreadsheet size={14} className="text-amber-400" /> 주문 파일 <span className="text-xs text-slate-500 font-normal">(마켓에서 주문받은 원본엑셀)</span>
         </p>
 
         {/* 직접 업로드 영역 */}
@@ -593,14 +594,14 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
             if (file) handleOrderFileUpload(file)
           }}
           onClick={() => orderFileInputRef.current?.click()}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
-            ${orderDragging ? 'border-amber-400/60 bg-amber-500/10' : 'border-amber-500/20 bg-dark-hover/40 hover:border-amber-500/40 hover:bg-amber-500/5'}`}
+          className={`flex items-center justify-center gap-3 px-6 py-[1.125rem] rounded-xl border-2 border-dashed cursor-pointer transition-all
+            ${orderDragging ? 'border-yellow-400 bg-yellow-400/20' : 'border-yellow-500/50 bg-yellow-500/10 hover:border-yellow-400 hover:bg-yellow-400/20'}`}
         >
           {isUploadingOrder
-            ? <Loader2 size={16} className="text-amber-400 animate-spin shrink-0" />
-            : <Upload size={16} className="text-amber-400 shrink-0" />
+            ? <Loader2 size={22} className="text-yellow-300 animate-spin shrink-0" />
+            : <Upload size={22} className="text-yellow-300 shrink-0" />
           }
-          <span className="text-sm text-slate-400">
+          <span className="text-base font-medium text-yellow-200">
             {isUploadingOrder ? '파일 읽는 중...' : '주문 파일 드래그하거나 클릭하여 선택 · xlsx, xls, csv'}
           </span>
           <input
@@ -633,9 +634,9 @@ export function InvoiceMatchTab({ source }: InvoiceMatchTabProps) {
             </select>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">저장된 주문 <span className="text-slate-300 font-medium">{filtered.length}</span>개</span>
-              {savedOrders.length >= 25 && (
+              {savedOrders.length >= 90 && (
                 <span className="text-amber-400/80">
-                  {savedOrders.length >= 30 ? '⚠ 최대 30개 도달 — 새 저장 시 오래된 항목 자동 삭제' : `⚠ 전체 ${savedOrders.length}/30개 — 초과 시 자동 삭제`}
+                  {savedOrders.length >= 100 ? '⚠ 100개 도달 — 새 저장 시 전체 초기화됩니다' : `⚠ 전체 ${savedOrders.length}/100개 — 100개 초과 시 전체 초기화`}
                 </span>
               )}
             </div>

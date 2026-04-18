@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database } from 'lucide-react'
+import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { ThemeToggle } from './ThemeToggle'
 
 const NAV_ITEMS = [
   { to: '/dashboard',   icon: BarChart3,  label: '대시보드',   tip: null },
   {
-    to: '/coupang-auto', icon: ShoppingCart, label: '쿠팡 자동매칭',
+    to: '/coupang-auto', icon: Zap, label: '자동매칭',
     tip: {
-      title: '쿠팡 자동매칭',
+      title: '자동매칭',
       rows: [
-        { label: '용도',   value: '쿠팡 API로 주문을 자동으로 가져와 거래처별 분류 출력' },
-        { label: '입력',   value: '쿠팡 API (날짜 범위 선택)' },
+        { label: '용도',   value: '마켓 API로 주문을 자동으로 가져와 거래처별 분류 출력' },
+        { label: '입력',   value: '마켓 API (날짜 범위 선택)' },
         { label: '출력',   value: '거래처별 B2B 파일 N개' },
       ],
     },
@@ -29,7 +29,7 @@ const NAV_ITEMS = [
     },
   },
   {
-    to: '/matching',    icon: GitMerge,  label: '주문매칭',
+    to: '/matching',    icon: GitMerge,  label: '1:1 주문매칭',
     tip: {
       title: '주문매칭',
       rows: [

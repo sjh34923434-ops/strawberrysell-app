@@ -6,12 +6,18 @@ interface Props { businessId: string; onClose: () => void }
 
 const MARKETPLACES = [
   { id: 'coupang',    label: '쿠팡',        apiReady: true  },
-  { id: 'smartstore', label: '스마트스토어', apiReady: false },
+  { id: 'smartstore', label: '스마트스토어', apiReady: true  },
   { id: '11st',       label: '11번가',      apiReady: false },
   { id: 'auction',    label: '옥션',        apiReady: false },
   { id: 'gmarket',    label: '지마켓',      apiReady: false },
   { id: 'etc',        label: '기타',        apiReady: false },
 ]
+
+// 마켓별 입력 필드 레이블
+const MARKET_LABELS: Record<string, { vendorId?: string; accessKey: string; secretKey: string; vendorIdPlaceholder?: string; accessKeyPlaceholder: string }> = {
+  coupang:    { vendorId: '업체코드 (Vendor ID)', vendorIdPlaceholder: 'A00000000', accessKey: 'Access Key', secretKey: 'Secret Key', accessKeyPlaceholder: 'API Access Key' },
+  smartstore: { accessKey: 'Client ID', secretKey: 'Client Secret', accessKeyPlaceholder: '네이버 커머스 API Client ID' },
+}
 
 export function AddConnectionModal({ businessId, onClose }: Props) {
   const { addConnection, testConnection } = useBusinessStore()
@@ -25,9 +31,12 @@ export function AddConnectionModal({ businessId, onClose }: Props) {
   const [testResult,  setTestResult]  = useState<{ ok: boolean; message: string } | null>(null)
   const [error,       setError]       = useState('')
 
+  const labels = MARKET_LABELS[selected] ?? MARKET_LABELS['coupang']
+  const needsVendorId = !!MARKET_LABELS[selected]?.vendorId
+
   const handleTest = async () => {
-    if (!accessKey || !secretKey || !vendorId) {
-      setError('API 키와 업체코드를 먼저 입력해주세요.')
+    if (!accessKey || !secretKey || (needsVendorId && !vendorId)) {
+      setError(needsVendorId ? 'API 키와 업체코드를 먼저 입력해주세요.' : 'Client ID와 Client Secret을 먼저 입력해주세요.')
       return
     }
     setIsTesting(true)
@@ -102,25 +111,39 @@ export function AddConnectionModal({ businessId, onClose }: Props) {
             </div>
           </div>
 
-          {/* 공통 입력 폼 */}
+          {/* 쿠팡 IP 허용 안내 */}
+          {selected === 'coupang' && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+              <span className="shrink-0 mt-0.5">⚠️</span>
+              <span>
+                발급 시 <strong>자체개발</strong>을 선택하시고 내용을 입력해주세요.<br />
+                쿠팡 WING → API 관리에서 아래 IP를 <strong>허용 IP로 등록</strong>해야 합니다.<br />
+                <span className="font-mono text-amber-200 select-all">137.66.36.129</span>
+              </span>
+            </div>
+          )}
+
+          {/* 마켓별 입력 폼 */}
           {selected && (
             <>
+              {needsVendorId && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">{labels.vendorId}</label>
+                  <input type="text" value={vendorId} onChange={e => setVendorId(e.target.value)}
+                    placeholder={labels.vendorIdPlaceholder}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono" />
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">업체코드 (Vendor ID)</label>
-                <input type="text" value={vendorId} onChange={e => setVendorId(e.target.value)}
-                  placeholder="A00000000"
-                  className="w-full px-3 py-2.5 rounded-xl text-sm bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Access Key</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">{labels.accessKey}</label>
                 <input type="text" value={accessKey} onChange={e => setAccessKey(e.target.value)}
-                  placeholder="API Access Key"
+                  placeholder={labels.accessKeyPlaceholder}
                   className="w-full px-3 py-2.5 rounded-xl text-sm bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Secret Key</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">{labels.secretKey}</label>
                 <input type="password" value={secretKey} onChange={e => setSecretKey(e.target.value)}
-                  placeholder="API Secret Key"
+                  placeholder={selected === 'smartstore' ? '네이버 커머스 API Client Secret' : 'API Secret Key'}
                   className="w-full px-3 py-2.5 rounded-xl text-sm bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono" />
               </div>
 

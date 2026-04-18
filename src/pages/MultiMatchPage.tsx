@@ -10,7 +10,7 @@ import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { readExcelFile, type ParsedExcel } from '../utils/excelReader'
 import { runMultiMatch, getUniqueValuesWithCount, type PartnerMatchResult } from '../utils/multiMatcher'
 import { downloadFilledB2b, buildExportFileName } from '../utils/excelWriter'
-import { useSettingsStore, type PartnerRule, type CoupangPartner } from '../stores/settingsStore'
+import { useSettingsStore, type PartnerRule, type CoupangPartner, MARKET_TYPES, type MarketType } from '../stores/settingsStore'
 import type { ColumnMapping } from '../utils/fillMapper'
 
 // ─── 상수 ──────────────────────────────────────────────────────────────────────
@@ -174,6 +174,7 @@ function ResultCard({ result, onDownload }: { result: PartnerMatchResult; onDown
 export function MultiMatchPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab]         = useState<'match' | 'invoice'>('match')
+  const [selectedMarketType, setSelectedMarketType] = useState<MarketType>('쿠팡')
   const [step, setStep]                   = useState<Step>(1)
   const [orderFile, setOrderFile]         = useState<File | null>(null)
   const [orderData, setOrderData]         = useState<ParsedExcel | null>(null)
@@ -243,6 +244,7 @@ export function MultiMatchPage() {
     }
     const currentVals = new Set(uniqueValues.map(v => v.value))
     const loaded: LocalPartner[] = []
+    const skipped: string[] = []
 
     for (const cp of coupangPartners) {
       const rawPrefix = (cp.prefix || cp.partnerName).trim()
@@ -251,6 +253,13 @@ export function MultiMatchPage() {
       const matched = [...currentVals].filter(v => v.slice(0, 2) === prefixKey)
 
       if (matched.length === 0) continue
+
+      // 선택된 마켓 매핑 없으면 건너뜀
+      const mm = cp.marketMappings?.find(m => m.marketType === selectedMarketType)
+      if (!mm) {
+        skipped.push(cp.partnerName)
+        continue
+      }
 
       let headers: string[] = cp.b2bHeaders ?? []
       if (headers.length === 0 && cp.b2bFileData) {
@@ -268,15 +277,22 @@ export function MultiMatchPage() {
         b2bHeaders:      headers,
         b2bFileName:     cp.b2bFileName?.replace(/\.[^/.]+$/, ''),
         mappingPresetId: cp.id,
-        mapping:         cp.mapping,
-        appendValues:    cp.appendValues,
+        mapping:         mm.mapping,
+        appendValues:    mm.appendValues,
         matchValues:     matched,
         loadingTemplate: false,
         expanded:        false,
       })
     }
 
-    if (loaded.length === 0) return
+    if (skipped.length > 0) {
+      setError(`${selectedMarketType} 매핑이 없어 건너뜀: ${skipped.join(', ')}\n거래처관리에서 ${selectedMarketType} 탭 매핑을 저장해 주세요.`)
+    }
+
+    if (loaded.length === 0) {
+      if (skipped.length === 0) setError('접두어와 일치하는 거래처가 없습니다.')
+      return
+    }
     setPartners(loaded)
 
     // 분류 완료 후 바로 매칭 실행 → step 3 결과로 직행
@@ -511,7 +527,7 @@ export function MultiMatchPage() {
         </div>
 
         {/* 송장 탭 */}
-        {activeTab === 'invoice' && <InvoiceMatchTab source="multi-match" />}
+        {activeTab === 'invoice' && <InvoiceMatchTab source="multi-match" marketType={selectedMarketType} />}
 
         {/* 매칭 탭 */}
         {activeTab === 'match' && <div className="space-y-6">
@@ -605,6 +621,26 @@ export function MultiMatchPage() {
                 </div>
               </>
             )}
+
+            {/* 마켓 선택 */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">주문 파일 마켓</p>
+              <div className="flex flex-wrap gap-2">
+                {MARKET_TYPES.map(mt => (
+                  <button
+                    key={mt}
+                    onClick={() => setSelectedMarketType(mt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all
+                      ${selectedMarketType === mt
+                        ? 'bg-primary-500/20 text-primary-300 border-primary-500/50'
+                        : 'bg-dark-hover text-slate-400 border-dark-border hover:border-primary-500/30 hover:text-primary-400'}`}
+                  >
+                    {mt}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">선택한 마켓의 저장된 컬럼 매핑이 자동 적용됩니다.</p>
+            </div>
 
             <button
               disabled={!orderData || !classifyColumn}

@@ -1,16 +1,30 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+
+const DEV_EMAIL    = (import.meta as any).env.VITE_DEV_EMAIL    as string | undefined
+const DEV_PASSWORD = (import.meta as any).env.VITE_DEV_PASSWORD as string | undefined
+
+// 컴포넌트 재마운트 시에도 한 번만 실행되도록 모듈 레벨에 선언
+let _devAutoLoginDone = false
 
 export function LoginPage() {
   const navigate            = useNavigate()
   const { login, isLoading, error, clearError } = useAuthStore()
 
-  const [email,      setEmail]      = useState('')
-  const [password,   setPassword]   = useState('')
+  const [email,      setEmail]      = useState(DEV_EMAIL    ?? '')
+  const [password,   setPassword]   = useState(DEV_PASSWORD ?? '')
   const [showPw,     setShowPw]     = useState(false)
   const [autoLogin,  setAutoLogin]  = useState(true)
+
+  // 개발 모드에서 자동 로그인 (앱 실행 중 딱 1회만)
+  useEffect(() => {
+    if (import.meta.env.DEV && DEV_EMAIL && DEV_PASSWORD && !_devAutoLoginDone) {
+      _devAutoLoginDone = true
+      login(DEV_EMAIL, DEV_PASSWORD).then(() => navigate('/dashboard')).catch(() => {})
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

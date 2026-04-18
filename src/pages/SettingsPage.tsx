@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
@@ -25,6 +26,7 @@ function Section({ title, icon: Icon, children }: {
 }
 
 export function SettingsPage() {
+  const navigate = useNavigate()
   const { user }                        = useAuthStore()
   const { licenseKey, isActivated, expiresAt, isLoading, error, activate, clearError } = useLicenseStore()
   const {
@@ -455,6 +457,17 @@ export function SettingsPage() {
             </button>
           </div>
         </Section>
+
+        {/* 저장 후 나가기 */}
+        <div className="flex justify-end pb-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white transition-all duration-150 shadow-lg shadow-primary-500/20"
+          >
+            <LogOut size={15} />
+            저장 후 나가기
+          </button>
+        </div>
 
       </div>
     </div>

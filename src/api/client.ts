@@ -27,7 +27,13 @@ api.interceptors.response.use(
     const isAuthEndpoint = url.includes('/auth/logout') || url.includes('/auth/refresh') || url.includes('/auth/login')
     if (error.response?.status !== 401 || isAuthEndpoint) return Promise.reject(error)
 
-    const originalConfig = error.config!
+    const originalConfig = error.config! as typeof error.config & { _retry?: boolean }
+    // 이미 재시도한 요청이 또 401을 받으면 무한루프 차단
+    if (originalConfig._retry) {
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+      return Promise.reject(error)
+    }
+    originalConfig._retry = true
 
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
@@ -189,6 +195,22 @@ export const coupangApi = {
       const { data } = await api.post<{ code: string; message: string; data?: unknown }>(
         `/businesses/${bizId}/connections/${connId}/coupang/shipments`,
         shipments
+      )
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+}
+
+// ─── 스마트스토어 API ──────────────────────────────────────────────────────────
+
+export const naverApi = {
+  getOrders: async (bizId: string, connId: string, startDate: string, endDate: string, status: string) => {
+    try {
+      const { data } = await api.get<{ orders: any[]; total: number }>(
+        `/businesses/${bizId}/connections/${connId}/naver/orders`,
+        { params: { startDate, endDate, status } }
       )
       return data
     } catch (err) {

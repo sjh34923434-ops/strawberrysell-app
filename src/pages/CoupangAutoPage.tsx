@@ -7,13 +7,14 @@ import {
   FileSpreadsheet, Users,
   Truck,
   FolderOpen,
-  Tag, Plus,
+  Tag, Plus, ChevronLeft, Zap, Store,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useBusinessStore } from '../stores/businessStore'
-import { useSettingsStore } from '../stores/settingsStore'
-import { coupangApi } from '../api/client'
+import { useSettingsStore, type MarketType } from '../stores/settingsStore'
+import { coupangApi, naverApi } from '../api/client'
 import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
+import { fillB2bFromOrder } from '../utils/fillMapper'
 
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
@@ -85,7 +86,52 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
-// ─── 메인 ─────────────────────────────────────────────────────────────────────
+// ─── 마켓 정의 ────────────────────────────────────────────────────────────────
+
+// marketplace 필드 매핑 (businessStore connection.marketplace 값)
+const MARKET_CONN_KEY: Record<MarketType, string> = {
+  '쿠팡':       'coupang',
+  '스마트스토어': 'smartstore',  // 추후 연동 시 실제 키로 변경
+  '옥션':       'auction',
+  '지마켓':     'gmarket',
+  '11번가':     '11st',
+  '기타':       'other',
+}
+
+const MARKET_CARDS = [
+  { type: '쿠팡'  as MarketType, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
+  { type: '스마트스토어' as MarketType, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  { type: '옥션'  as MarketType, color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/30' },
+  { type: '지마켓' as MarketType, color: 'text-red-400',   bg: 'bg-red-500/10',    border: 'border-red-500/30' },
+  { type: '11번가' as MarketType, color: 'text-rose-400',  bg: 'bg-rose-500/10',   border: 'border-rose-500/30' },
+  { type: '기타'  as MarketType, color: 'text-slate-400',  bg: 'bg-slate-500/10',  border: 'border-slate-500/20' },
+]
+
+// ─── 마켓별 API 호출 (연동 완료 마켓만 실제 구현) ─────────────────────────────
+async function fetchOrdersByMarket(
+  market: MarketType,
+  bizId: string, connId: string,
+  startDate: string, endDate: string, orderStatus: string
+): Promise<any[]> {
+  switch (market) {
+    case '쿠팡': {
+      const result = await coupangApi.getOrders(bizId, connId, startDate, endDate, orderStatus)
+      return result.orders as any[]
+    }
+    case '스마트스토어': {
+      const result = await naverApi.getOrders(bizId, connId, startDate, endDate, orderStatus)
+      return result.orders as any[]
+    }
+    // ─ 아래 마켓은 API 연동 시 case 추가 ─
+    // case '옥션':    return await auctionApi.getOrders(...)
+    // case '지마켓':  return await gmarketApi.getOrders(...)
+    // case '11번가':  return await elevenApi.getOrders(...)
+    default:
+      throw new Error(`${market} API는 아직 연동되지 않았습니다.\n연동 완료 후 자동으로 사용 가능합니다.`)
+  }
+}
+
+// ─── 메인 ──────────────────────────────────────────────────────────────────────
 
 export function CoupangAutoPage() {
   const navigate = useNavigate()
@@ -96,6 +142,7 @@ export function CoupangAutoPage() {
   } = useSettingsStore()
 
   const [activeTab, setActiveTab] = useState<Tab>('match')
+  const [selectedMarket, setSelectedMarket] = useState<MarketType | null>(null)
 
   // ── 주문 매칭 상태 ──────────────────────────────────────────────────────────
   const [step,           setStep]           = useState<Step>(1)
@@ -108,7 +155,7 @@ export function CoupangAutoPage() {
   const [fetchProgress,  setFetchProgress]  = useState(0)
   const [fetchedOrders,  setFetchedOrders]  = useState<any[] | null>(null)
   const [selectedConfigId, setSelectedConfigId] = useState<string>('')
-  const [classifyColumn,   setClassifyColumn]   = useState<string>('업체상품코드')
+  const [classifyColumn,   setClassifyColumn]   = useState<string>('업체관리코드')
   const [isMatching,       setIsMatching]        = useState(false)
   const [matchResult,      setMatchResult]       = useState<Record<string, any[]>>({})
   const [showOrderList,    setShowOrderList]     = useState(false)
@@ -117,39 +164,46 @@ export function CoupangAutoPage() {
 
   useEffect(() => { fetchBiz() }, [])
 
-  const coupangBizList = businesses.map(b => ({
-    ...b,
-    coupangConns: b.connections.filter(c => c.marketplace === 'coupang'),
-  })).filter(b => b.coupangConns.length > 0)
-
-  const availablePartners = coupangPartners.filter(p => p.b2bFileData)
+  // 현재 선택된 마켓의 연동 사업자 목록
+  const marketBizList = selectedMarket
+    ? businesses.map(b => ({
+        ...b,
+        marketConns: b.connections.filter(c =>
+        c.marketplace === MARKET_CONN_KEY[selectedMarket] &&
+        (MARKET_CONN_KEY[selectedMarket] === 'coupang' ? !!c.vendorId : c.hasAccessKey)
+      ),
+      })).filter(b => b.marketConns.length > 0)
+    : []
 
   const handleBizChange = (bizId: string) => {
     setSelectedBizId(bizId)
-    const biz = coupangBizList.find(b => b.id === bizId)
-    setSelectedConnId(biz?.coupangConns[0]?.id ?? '')
+    const biz = marketBizList.find(b => b.id === bizId)
+    setSelectedConnId(biz?.marketConns[0]?.id ?? '')
     setFetchedOrders(null)
   }
 
-  const canFetch = !!selectedConnId && !!startDate && !!endDate
+  const canFetch = !!startDate && !!endDate && !!selectedBizId && !!selectedConnId
+
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const handleFetch = async () => {
-    if (!selectedBizId || !selectedConnId) return
+    if (!selectedMarket) return
     setIsFetching(true)
     setFetchedOrders(null)
     setFetchProgress(0)
+    setFetchError(null)
 
-    // 진행률 애니메이션 (API 응답 대기 중)
     const progressInterval = setInterval(() => {
       setFetchProgress(p => p < 85 ? p + 5 : p)
     }, 200)
 
     try {
-      const result = await coupangApi.getOrders(selectedBizId, selectedConnId, startDate, endDate, orderStatus)
+      const orders = await fetchOrdersByMarket(
+        selectedMarket, selectedBizId, selectedConnId, startDate, endDate, orderStatus
+      )
       clearInterval(progressInterval)
       setFetchProgress(100)
       await new Promise(r => setTimeout(r, 300))
-      const orders = result.orders as any[]
       setFetchedOrders(orders)
       if (orders.length > 0) {
         saveOrder('coupang-api', Object.keys(orders[0]), orders as Record<string, unknown>[])
@@ -157,7 +211,7 @@ export function CoupangAutoPage() {
     } catch (err: any) {
       clearInterval(progressInterval)
       setFetchProgress(0)
-      alert(err.message || '주문 조회 중 오류가 발생했습니다.')
+      setFetchError(err.message || '주문 조회 중 오류가 발생했습니다.')
     } finally {
       setIsFetching(false)
     }
@@ -170,9 +224,10 @@ export function CoupangAutoPage() {
 
     if (!fetchedOrders) { setIsMatching(false); return }
 
+    const matchableOrders = fetchedOrders.filter(o => o['주문상태'] === '상품준비중')
     const result: Record<string, any[]> = {}
 
-    for (const order of fetchedOrders) {
+    for (const order of matchableOrders) {
       const code = String((order as any)[classifyColumn] ?? '')
       const codeKey = code.slice(0, 2)
       const partner = coupangPartners.find(p => {
@@ -189,13 +244,51 @@ export function CoupangAutoPage() {
     setStep(3)
   }
 
+  // ── 거래처별 B2B 다운로드 ──────────────────────────────────────────────────
+  const downloadB2bForPartner = (partnerName: string, orders: any[]) => {
+    const partner = coupangPartners.find(p => p.partnerName === partnerName)
+    if (!partner || !partner.b2bHeaders.length) {
+      alert(`${partnerName}: B2B 파일 양식이 등록되지 않았습니다.\n거래처 B2B 관리에서 양식을 먼저 등록해주세요.`)
+      return
+    }
+    const marketMapping = selectedMarket
+      ? partner.marketMappings?.find(m => m.marketType === selectedMarket)
+      : undefined
+    const mapping    = marketMapping?.mapping    ?? partner.mapping
+    const appendVals = marketMapping?.appendValues ?? partner.appendValues
+    const { rows }   = fillB2bFromOrder(orders, partner.b2bHeaders, mapping, appendVals)
+    const ws = XLSX.utils.json_to_sheet(rows, { header: partner.b2bHeaders })
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'B2B주문')
+    XLSX.writeFile(wb, `${partnerName}_B2B_${startDate}_${endDate}.xlsx`)
+  }
+
+  const downloadAllB2b = () => {
+    const wb = XLSX.utils.book_new()
+    Object.entries(matchResult).forEach(([name, orders]) => {
+      if (name === '(미매칭)') return
+      const partner = coupangPartners.find(p => p.partnerName === name)
+      if (!partner || !partner.b2bHeaders.length) return
+      const marketMapping = selectedMarket
+        ? partner.marketMappings?.find(m => m.marketType === selectedMarket)
+        : undefined
+      const mapping    = marketMapping?.mapping    ?? partner.mapping
+      const appendVals = marketMapping?.appendValues ?? partner.appendValues
+      const { rows }   = fillB2bFromOrder(orders, partner.b2bHeaders, mapping, appendVals)
+      const ws = XLSX.utils.json_to_sheet(rows, { header: partner.b2bHeaders })
+      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31))
+    })
+    if (wb.SheetNames.length === 0) { alert('다운로드할 B2B 파일이 없습니다.'); return }
+    XLSX.writeFile(wb, `전체B2B_${startDate}_${endDate}.xlsx`)
+  }
+
   const partnerSummary = fetchedOrders
     ? Object.entries(
         fetchedOrders.reduce((acc, o) => {
           const key = String((o as Record<string, unknown>)[classifyColumn] ?? '(없음)')
           if (!acc[key]) acc[key] = { count: 0, amount: 0 }
-          acc[key].count  += o.수량
-          acc[key].amount += o.금액
+          acc[key].count  += Number(o['수량'] ?? 0)
+          acc[key].amount += Number(o['금액'] ?? 0)
           return acc
         }, {} as Record<string, { count: number; amount: number }>)
       )
@@ -213,16 +306,91 @@ export function CoupangAutoPage() {
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-5 animate-fade-in">
 
         {/* 헤더 */}
-        <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <ShoppingCart size={20} className="text-orange-400" />
-            쿠팡 자동매칭
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            쿠팡 API로 주문을 가져와 거래처별로 자동 분류·출력합니다
-          </p>
+        <div className="flex items-center gap-3">
+          {selectedMarket && (
+            <button
+              onClick={() => { setSelectedMarket(null); setStep(1); setFetchedOrders(null); setMatchResult({}) }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-dark-hover border border-dark-border text-slate-400 hover:text-slate-200 transition-all shrink-0"
+            >
+              <ChevronLeft size={13} /> 마켓 선택
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+              <Zap size={18} className="text-primary-400" />
+              자동매칭
+              {selectedMarket && <span className="text-orange-400 text-base font-semibold">{selectedMarket}</span>}
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              {selectedMarket ? '주문을 자동으로 가져와 거래처별 B2B 파일로 출력합니다' : '마켓을 선택하세요'}
+            </p>
+          </div>
         </div>
 
+        {/* ═══════════════════════════════════════════════════════════════════
+            마켓 허브 (미선택)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {!selectedMarket && (
+          <div className="space-y-5 animate-fade-in">
+            <div className="flex items-center gap-2 p-1 rounded-xl bg-dark-card border border-dark-border">
+              <button onClick={() => setActiveTab('match')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
+                  ${activeTab === 'match' ? 'bg-primary-500/15 text-primary-300 border-primary-500/40' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <Zap size={14} /> 주문 매칭
+              </button>
+              <button onClick={() => setActiveTab('invoice')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all
+                  ${activeTab === 'invoice' ? 'bg-amber-500/15 text-amber-300 border-amber-500/40' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <Truck size={14} /> 송장번호 추가
+              </button>
+            </div>
+
+            {activeTab === 'match' && (
+              <div className="grid grid-cols-2 gap-3">
+                {MARKET_CARDS.map(({ type, color, bg, border }) => {
+                  const connKey = MARKET_CONN_KEY[type]
+                  const isConnected = businesses.some(b => b.connections.some(c =>
+                    c.marketplace === connKey && (connKey === 'coupang' ? !!c.vendorId : c.hasAccessKey)
+                  ))
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedMarket(type)}
+                      className={`relative flex flex-col items-center gap-3 px-4 py-7 rounded-2xl border-2 transition-all duration-200
+                        ${bg} ${border} hover:scale-[1.03] hover:shadow-lg cursor-pointer active:scale-[0.98]`}
+                    >
+                      <span className={`absolute top-3 right-3 text-xs px-2 py-0.5 rounded border ${
+                        isConnected
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : 'bg-slate-500/15 text-slate-500 border-slate-500/20'
+                      }`}>
+                        {isConnected ? '연동됨' : '미연동'}
+                      </span>
+                      <div className={`w-14 h-14 rounded-xl ${bg} border ${border} flex items-center justify-center`}>
+                        <Store size={26} className={color} />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-base font-bold ${color}`}>{type}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">API 자동 주문 수집</p>
+                        <p className={`text-xs font-semibold mt-1.5 ${['쿠팡', '스마트스토어'].includes(type) ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {['쿠팡', '스마트스토어'].includes(type) ? '사용가능' : '준비중'}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {activeTab === 'invoice' && <InvoiceMatchTab source="coupang-api" marketType={selectedMarket ?? '쿠팡'} />}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            마켓 선택 후: 모든 마켓 공통 UI
+        ═══════════════════════════════════════════════════════════════════ */}
+        {selectedMarket && (
+          <>
         {/* ── 탭 ──────────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 p-1 rounded-xl bg-dark-card border border-dark-border">
           <button
@@ -267,10 +435,10 @@ export function CoupangAutoPage() {
                       <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
                         <Loader2 size={13} className="animate-spin" /> 불러오는 중...
                       </div>
-                    ) : coupangBizList.length === 0 ? (
-                      <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                    ) : marketBizList.length === 0 ? (
+                      <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
                         <AlertCircle size={13} />
-                        쿠팡 연동된 사업자가 없습니다. 사업자 관리에서 쿠팡 API 키를 먼저 등록해주세요.
+                        {selectedMarket} 연동된 사업자가 없습니다. 사업자 관리에서 {selectedMarket} API 키를 먼저 등록해주세요.
                       </div>
                     ) : (
                       <select
@@ -279,7 +447,7 @@ export function CoupangAutoPage() {
                         className="w-full px-3 py-2.5 rounded-xl text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:border-primary-500/50"
                       >
                         <option value="">— 사업자를 선택하세요 —</option>
-                        {coupangBizList.map(b => (
+                        {marketBizList.map(b => (
                           <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
                       </select>
@@ -305,17 +473,36 @@ export function CoupangAutoPage() {
                       <Package size={12} /> 주문 상태
                     </label>
                     <div className="flex flex-wrap gap-1.5">
-                      {ORDER_STATUSES.map(({ value, label }) => (
-                        <button key={value} onClick={() => setOrderStatus(value)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                            ${orderStatus === value
-                              ? 'bg-primary-500/20 text-primary-300 border-primary-500/40'
-                              : 'bg-dark-hover border-dark-border text-slate-400 hover:border-primary-500/30 hover:text-primary-400'
-                            }`}
-                        >{label}</button>
-                      ))}
+                      {ORDER_STATUSES.map(({ value, label }) => {
+                        const STATUS_KO: Record<string, string> = {
+                          ALL: '', ACCEPT: '신규주문', INSTRUCT: '상품준비중',
+                          DEPARTURE: '배송지시', DELIVERING: '배송중', FINAL_DELIVERY: '배송완료',
+                        }
+                        const koLabel = STATUS_KO[value]
+                        const cnt = fetchedOrders
+                          ? value === 'ALL'
+                            ? fetchedOrders.length
+                            : fetchedOrders.filter(o => o['주문상태'] === koLabel).length
+                          : null
+                        return (
+                          <button key={value} onClick={() => setOrderStatus(value)}
+                            className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all flex flex-col items-center gap-0.5 min-w-[52px]
+                              ${orderStatus === value
+                                ? 'bg-primary-500/20 text-primary-300 border-primary-500/40'
+                                : 'bg-dark-hover border-dark-border text-slate-400 hover:border-primary-500/30 hover:text-primary-400'
+                              }`}
+                          >
+                            <span>{label}</span>
+                            {cnt !== null && (
+                              <span className={`text-base font-bold leading-none ${cnt > 0 ? 'text-primary-300' : 'text-slate-600'}`}>
+                                {cnt}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
-                    <p className="text-xs text-slate-600"><span className="text-slate-400">상태 선택</span> 후 아래 <span className="text-slate-400">쿠팡 주문 가져오기</span> 버튼을 눌러주세요.</p>
+                    <p className="text-xs text-slate-600"><span className="text-slate-400">상태 선택</span> 후 아래 <span className="text-slate-400">주문 가져오기</span> 버튼을 눌러주세요.</p>
                   </div>
 
                   {fetchedOrders !== null && (
@@ -330,16 +517,22 @@ export function CoupangAutoPage() {
                   💡 거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해야 적용됩니다.
                 </p>
 
-                <button disabled={!canFetch || isFetching || coupangBizList.length === 0} onClick={handleFetch}
+                {fetchError && (
+                  <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 whitespace-pre-line">
+                    <AlertCircle size={13} className="shrink-0 mt-0.5" /> {fetchError}
+                  </div>
+                )}
+
+                <button disabled={!canFetch || isFetching} onClick={handleFetch}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/20">
-                  {isFetching ? <><Loader2 size={15} className="animate-spin" /> 주문 가져오는 중...</> : <><RefreshCw size={15} /> 쿠팡 주문 가져오기</>}
+                  {isFetching ? <><Loader2 size={15} className="animate-spin" /> 주문 가져오는 중...</> : <><RefreshCw size={15} /> {selectedMarket} 주문 가져오기</>}
                 </button>
 
                 {/* 진행률 바 */}
                 {isFetching && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>쿠팡 주문 수집 중...</span>
+                      <span>{selectedMarket} 주문 수집 중...</span>
                       <span className="font-mono text-orange-400">{fetchProgress}%</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-dark-hover overflow-hidden">
@@ -369,9 +562,9 @@ export function CoupangAutoPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20">
                   {isMatching ? <><Loader2 size={14} className="animate-spin" /> 매칭 중...</> : '매칭 실행 →'}
                 </button>
-                <button onClick={() => navigate('/dashboard')}
+                <button onClick={() => { setSelectedMarket(null); setStep(1); setFetchedOrders(null); setMatchResult({}) }}
                   className="w-full py-2.5 rounded-xl text-sm font-medium bg-dark-hover border border-dark-border text-slate-300 hover:bg-dark-muted transition-all">
-                  ← 뒤로가기
+                  ← 마켓 선택
                 </button>
               </div>
             )}
@@ -402,7 +595,7 @@ export function CoupangAutoPage() {
                       <p className="text-xs text-slate-500">거래처 수</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-slate-100">{fetchedOrders?.reduce((s, o) => s + o.수량, 0) ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-100">{fetchedOrders?.reduce((s, o) => s + Number(o['수량'] ?? 0), 0) ?? 0}</p>
                       <p className="text-xs text-slate-500">총 수량</p>
                     </div>
                   </div>
@@ -552,7 +745,9 @@ export function CoupangAutoPage() {
                           <p className="text-xs text-slate-500">{orders.length}건</p>
                         </div>
                         {name !== '(미매칭)' && (
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/15 text-primary-400 border border-primary-500/20 hover:bg-primary-500/25 transition-all">
+                          <button
+                            onClick={() => downloadB2bForPartner(name, orders)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/15 text-primary-400 border border-primary-500/20 hover:bg-primary-500/25 transition-all">
                             <FileSpreadsheet size={11} /> B2B 다운로드
                           </button>
                         )}
@@ -561,8 +756,10 @@ export function CoupangAutoPage() {
                   </div>
                 </div>
 
-                <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-lg shadow-emerald-500/20">
-                  <Download size={15} /> 전체 ZIP 다운로드
+                <button
+                  onClick={downloadAllB2b}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-lg shadow-emerald-500/20">
+                  <Download size={15} /> 전체 B2B 한번에 다운로드 (시트별)
                 </button>
 
                 <button onClick={() => { setStep(1); setMatchResult({}) }}
@@ -574,11 +771,11 @@ export function CoupangAutoPage() {
           </>
         )}
 
-        {/* ════════════════════════════════════════════════════════════════════
-            탭 2: 송장번호 추가
-        ════════════════════════════════════════════════════════════════════ */}
+        {/* 송장번호 추가 탭 */}
         {activeTab === 'invoice' && (
-          <InvoiceMatchTab source="coupang-api" />
+          <InvoiceMatchTab source="coupang-api" marketType={selectedMarket ?? '쿠팡'} />
+        )}
+          </>
         )}
 
       </div>

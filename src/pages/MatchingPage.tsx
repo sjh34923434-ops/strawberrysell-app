@@ -14,7 +14,7 @@ import {
   type ColumnMapping,
   type FillResult,
 } from '../utils/fillMapper'
-import { useSettingsStore, type CoupangPartner } from '../stores/settingsStore'
+import { useSettingsStore, type CoupangPartner, MARKET_TYPES, type MarketType } from '../stores/settingsStore'
 import { buildExportFileName } from '../utils/excelWriter'
 import type { ExcelRow } from '../utils/excelReader'
 
@@ -46,8 +46,8 @@ type PageMode = 'order' | 'invoice-saved'
 
 const MODE_CONFIG = {
   order: {
-    label:        '주문 → B2B 입력',
-    desc:         '주문 파일 정보를 B2B 양식에 맞게 채워 다운로드합니다',
+    label:        '주문데이터 → B2B 입력',
+    desc:         '주문파일을 넣으시면 자동으로 B2B파일에 맞게 채워진 엑셀파일이 생성됩니다.',
     file1Label:   '주문 파일 (데이터 원본)',
     file2Label:   'B2B 양식 파일',
     actionLabel:  'B2B 파일 생성',
@@ -105,9 +105,10 @@ export function MatchingPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error,        setError]        = useState<string | null>(null)
 
-  const [b2bFileBase64,  setB2bFileBase64]  = useState<string>('')
-  const [_presetLoaded,  setPresetLoaded]   = useState(false)
-  const [loadedPresetId, setLoadedPresetId] = useState<string | undefined>(undefined)
+  const [b2bFileBase64,      setB2bFileBase64]      = useState<string>('')
+  const [_presetLoaded,      setPresetLoaded]        = useState(false)
+  const [loadedPresetId,     setLoadedPresetId]      = useState<string | undefined>(undefined)
+  const [selectedMarketType, setSelectedMarketType]  = useState<MarketType>('쿠팡')
 
   const { coupangPartners, updateCoupangPartner, saveOrder, fileNameDateEnabled, fileNameDateFormat } = useSettingsStore()
 
@@ -139,7 +140,7 @@ export function MatchingPage() {
 
   // ─── 거래처관리에서 불러오기 ──────────────────────────────────────────────────
 
-  const handleLoadPartner = async (partnerId: string) => {
+  const handleLoadPartner = async (partnerId: string, marketType: MarketType = '쿠팡') => {
     const partner = coupangPartners.find((p) => p.id === partnerId)
     if (!partner) return
     skipAutoMatchRef.current = true
@@ -148,11 +149,13 @@ export function MatchingPage() {
       await handleB2bFile(file)
       setB2bFileBase64(partner.b2bFileData)
     }
-    setMapping(partner.mapping)
-    setAppendValues(partner.appendValues ?? {})
+    // 선택된 마켓 타입의 매핑 사용, 없으면 레거시 매핑 폴백
+    const mm = partner.marketMappings?.find(m => m.marketType === marketType)
+    setMapping(mm?.mapping ?? partner.mapping)
+    setAppendValues(mm?.appendValues ?? partner.appendValues ?? {})
+    setSelectedMarketType(marketType)
     setPresetLoaded(true)
     setLoadedPresetId(partner.id)
-    // useEffect가 먼저 실행된 후 플래그 해제 (레이스 컨디션 방지)
     setTimeout(() => { skipAutoMatchRef.current = false }, 0)
   }
 
@@ -323,7 +326,7 @@ export function MatchingPage() {
                 : 'text-slate-500 border-transparent hover:text-slate-300'}`}
           >
             <GitMerge size={15} />
-            주문 → B2B 입력
+            주문데이터 → B2B 입력
           </button>
           <button
             onClick={() => handleModeChange('invoice-saved')}
@@ -338,13 +341,14 @@ export function MatchingPage() {
         </div>
 
         {/* ── 헤더 ────────────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between">
+        {mode !== 'invoice-saved' && <div className="flex items-start justify-between">
           <div>
             <h1 className={`text-xl font-bold transition-colors duration-200
               ${false ? 'text-amber-300' : 'text-slate-100 dark:text-slate-100 text-gray-900'}`}>
               {cfg.label}
             </h1>
-            <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500 mt-1">
+            <p className="text-sm font-semibold text-red-400 mt-1">1개 B2B 사이트만 매칭됩니다.</p>
+            <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500 mt-0.5">
               {cfg.desc}
             </p>
           </div>
@@ -357,7 +361,7 @@ export function MatchingPage() {
               처음부터
             </button>
           )}
-        </div>
+        </div>}
 
         {/* 에러 */}
         {error && (
@@ -368,7 +372,7 @@ export function MatchingPage() {
         )}
 
         {/* ── 파일 업로드 섹션 ────────────────────────────────────────────────── */}
-        <div className={`
+        {mode !== 'invoice-saved' && <div className={`
           bg-dark-card dark:bg-dark-card bg-white rounded-2xl p-6 space-y-4
           border transition-colors duration-300
           ${false
@@ -396,24 +400,39 @@ export function MatchingPage() {
               <div className="space-y-2 animate-fade-in">
                 <p className="text-xs font-medium text-emerald-400">거래처를 선택하세요</p>
                 {filtered.map(partner => (
-                  <button
-                    key={partner.id}
-                    onClick={() => handleLoadPartner(partner.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-dark-hover border border-emerald-500/20 hover:border-emerald-500/40 transition-colors group text-left"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-200 group-hover:text-emerald-300 transition-colors truncate">{partner.partnerName}</p>
-                        {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 border border-primary-500/30 shrink-0">{partner.prefix}</span>}
-                        <span className="text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30 whitespace-nowrap shrink-0">클릭 적용</span>
+                  <div key={partner.id} className="rounded-lg border border-emerald-500/20 bg-dark-hover overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-200 truncate">{partner.partnerName}</p>
+                          {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 border border-primary-500/30 shrink-0">{partner.prefix}</span>}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{partner.b2bFileName}</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5 truncate">
-                        {partner.b2bFileName} · 매핑 {Object.values(partner.mapping).filter(Boolean).length}개
-                        {partner.appendValues && Object.values(partner.appendValues).filter(Boolean).length > 0
-                          && ` · 추가텍스트 ${Object.values(partner.appendValues).filter(Boolean).length}개`}
-                      </p>
                     </div>
-                  </button>
+                    {/* 마켓 타입 선택 버튼 */}
+                    <div className="flex flex-wrap gap-1 px-3 pb-2">
+                      {MARKET_TYPES.map(mt => {
+                        const hasMM = partner.marketMappings?.some(m => m.marketType === mt && (m.marketHeaders?.length ?? 0) > 0)
+                        const isActive = loadedPresetId === partner.id && selectedMarketType === mt
+                        return (
+                          <button
+                            key={mt}
+                            onClick={() => handleLoadPartner(partner.id, mt)}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-all
+                              ${isActive
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : hasMM
+                                  ? 'bg-primary-500/10 text-primary-300 border-primary-500/20 hover:border-primary-400'
+                                  : 'bg-dark-muted text-slate-500 border-slate-700 hover:text-slate-300'}`}
+                          >
+                            {mt}
+                            {hasMM && <span className="w-1 h-1 rounded-full bg-emerald-400" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -423,7 +442,7 @@ export function MatchingPage() {
               </div>
             )
           })()}
-        </div>
+        </div>}
 
         {/* ── 컬럼 매핑 (자동 매칭 실패 시 수동 조정용) ──────────────────────── */}
         {bothFilesReady && !result && mode === 'order' && (
@@ -439,6 +458,7 @@ export function MatchingPage() {
               b2bFileName={b2bFile?.name}
               b2bFileData={b2bFileBase64}
               loadedPresetId={loadedPresetId}
+              selectedMarketType={selectedMarketType}
               mode={mode as 'order' | 'invoice'}
               onMappingChange={(m) => { setMapping(m); setPresetLoaded(false) }}
               onAppendValuesChange={setAppendValues}
@@ -489,6 +509,11 @@ export function MatchingPage() {
           </div>
         )}
 
+        {/* ── 송장번호 전송 탭 ─────────────────────────────────────────────────── */}
+        {mode === 'invoice-saved' && (
+          <InvoiceMatchTab source="matching" marketType={selectedMarketType} />
+        )}
+
         {/* ── 뒤로가기 ─────────────────────────────────────────────────────────── */}
         <div className="pt-2 pb-4">
           <button
@@ -503,11 +528,6 @@ export function MatchingPage() {
             뒤로가기
           </button>
         </div>
-
-        {/* ── 송장번호 전송 탭 ─────────────────────────────────────────────────── */}
-        {mode === 'invoice-saved' && (
-          <InvoiceMatchTab source="matching" />
-        )}
 
       </div>
     </div>

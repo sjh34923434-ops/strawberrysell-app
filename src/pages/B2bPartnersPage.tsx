@@ -3,7 +3,7 @@ import {
   Database, Plus, Pencil, Trash2, Tag, X,
   CheckCircle2, FileSpreadsheet, AlertCircle, Store, Truck, Zap,
 } from 'lucide-react'
-import { useSettingsStore, type CoupangPartner, type MarketTemplate, type SupplierMappingPreset } from '../stores/settingsStore'
+import { useSettingsStore, type CoupangPartner, type MarketTemplate, type SupplierMappingPreset, type MarketType, MARKET_TYPES } from '../stores/settingsStore'
 import { FileUploader } from '../components/FileUploader'
 import { ColumnMapper } from '../components/ColumnMapper'
 import { readExcelFile } from '../utils/excelReader'
@@ -47,22 +47,24 @@ const emptySupplierForm = (): SupplierForm => ({
 })
 
 interface FormState {
-  name:            string
-  prefix:          string   // B2B 탭 전용
-  b2bFile:         File | null
-  headers:         string[]
-  fileData:        string
-  marketFile:      File | null
-  marketHeaders:   string[]
-  marketFileData:  string
-  mapping:         ColumnMapping
-  appendValues:    Record<string, string>
-  loadedPresetId:  string | null
+  name:                string
+  prefix:              string
+  b2bFile:             File | null
+  headers:             string[]
+  fileData:            string
+  selectedMarketType:  MarketType
+  marketFile:          File | null
+  marketHeaders:       string[]
+  marketFileData:      string
+  mapping:             ColumnMapping
+  appendValues:        Record<string, string>
+  loadedPresetId:      string | null
 }
 
 const emptyForm = (): FormState => ({
   name: '', prefix: '', b2bFile: null,
   headers: [], fileData: '',
+  selectedMarketType: '쿠팡',
   marketFile: null, marketHeaders: [], marketFileData: '',
   mapping: {}, appendValues: {}, loadedPresetId: null,
 })
@@ -77,21 +79,21 @@ function PartnerCard({
   onEdit: () => void; onDelete: () => void
 }) {
   return (
-    <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-dark-border bg-dark-card hover:border-primary-500/30 transition-all group">
-      <div className="w-14 h-14 rounded-xl bg-primary-500/10 border border-primary-500/20 flex flex-col items-center justify-center shrink-0 gap-0.5">
+    <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-dark-border bg-dark-card hover:border-primary-500/30 transition-all group">
+      <div className="w-9 h-9 rounded-lg bg-primary-500/10 border border-primary-500/20 flex flex-col items-center justify-center shrink-0 gap-0">
         {prefix ? (
           <>
-            <span className="text-base font-bold text-primary-400 leading-none">{prefix}</span>
-            <span className="text-[9px] text-slate-600">접두어</span>
+            <span className="text-[10px] font-bold text-primary-400 leading-none">{prefix}</span>
+            <span className="text-[8px] text-slate-600">접두어</span>
           </>
         ) : (
-          <Store size={20} className="text-primary-400" />
+          <Store size={14} className="text-primary-400" />
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-200">{name}</p>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold text-slate-200">{name}</p>
           {fileName ? (
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <FileSpreadsheet size={11} /> {fileName}
@@ -127,7 +129,7 @@ function PartnerCard({
 
 export function B2bPartnersPage() {
   const {
-    coupangPartners, saveCoupangPartner, updateCoupangPartner, deleteCoupangPartner,
+    coupangPartners, saveCoupangPartner, updateCoupangPartner, deleteCoupangPartner, savePerMarketMapping, deletePerMarketMapping,
     marketTemplates, saveMarketTemplate, updateMarketTemplate, deleteMarketTemplate,
     supplierMappingPresets, saveSupplierMappingPreset, updateSupplierMappingPreset, deleteSupplierMappingPreset,
   } = useSettingsStore()
@@ -200,10 +202,17 @@ export function B2bPartnersPage() {
 
   const openEditB2b = (p: CoupangPartner) => {
     setEditingId(p.id)
+    // 쿠팡 탭 기본 로드: marketMappings['쿠팡'] 있으면 그 데이터, 없으면 레거시 mapping 사용
+    const coupangMM = p.marketMappings?.find(m => m.marketType === '쿠팡')
     setForm({ name: p.partnerName, prefix: p.prefix, b2bFile: null,
       headers: p.b2bHeaders, fileData: p.b2bFileData ?? '',
-      marketFile: null, marketHeaders: p.marketHeaders ?? [], marketFileData: p.marketFileData ?? '',
-      mapping: p.mapping, appendValues: p.appendValues, loadedPresetId: null })
+      selectedMarketType: '쿠팡',
+      marketFile: null,
+      marketHeaders: coupangMM?.marketHeaders ?? p.marketHeaders ?? [],
+      marketFileData: coupangMM?.marketFileData ?? p.marketFileData ?? '',
+      mapping: coupangMM?.mapping ?? p.mapping,
+      appendValues: coupangMM?.appendValues ?? p.appendValues,
+      loadedPresetId: null })
     setFormOpen(true)
   }
 
@@ -246,21 +255,53 @@ export function B2bPartnersPage() {
     } catch (err) { console.error(err) }
   }
 
+  // 마켓 탭 전환 시 해당 마켓의 저장된 매핑 로드
+  const handleMarketTypeChange = (mt: MarketType) => {
+    if (!editingId) { setForm(f => ({ ...f, selectedMarketType: mt, marketFile: null, marketHeaders: [], marketFileData: '', mapping: {}, appendValues: {} })); return }
+    const partner = coupangPartners.find(p => p.id === editingId)
+    const mm = partner?.marketMappings?.find(m => m.marketType === mt)
+    setForm(f => ({
+      ...f,
+      selectedMarketType: mt,
+      marketFile: null,
+      marketHeaders: mm?.marketHeaders ?? [],
+      marketFileData: mm?.marketFileData ?? '',
+      mapping: mm?.mapping ?? {},
+      appendValues: mm?.appendValues ?? {},
+      loadedPresetId: null,
+    }))
+  }
+
   const handleSave = () => {
     if (!form.name.trim()) return
     if (isB2b && !form.prefix.trim()) return
 
     if (isB2b) {
       const existing = editingId ? coupangPartners.find(p => p.id === editingId) : null
+      // 현재 마켓 탭의 매핑을 marketMappings에 업데이트
+      const currentMM = {
+        marketType:      form.selectedMarketType,
+        marketFileName:  form.marketFile?.name ?? existing?.marketMappings?.find(m => m.marketType === form.selectedMarketType)?.marketFileName,
+        marketFileData:  form.marketFileData || existing?.marketMappings?.find(m => m.marketType === form.selectedMarketType)?.marketFileData,
+        marketHeaders:   form.marketHeaders.length > 0 ? form.marketHeaders : (existing?.marketMappings?.find(m => m.marketType === form.selectedMarketType)?.marketHeaders ?? []),
+        mapping:         form.mapping,
+        appendValues:    form.appendValues,
+      }
+      const prevMMs = existing?.marketMappings ?? []
+      const newMMs = [...prevMMs.filter(m => m.marketType !== form.selectedMarketType), currentMM]
+      // 쿠팡 탭이면 레거시 필드도 함께 저장
+      const isCoupang = form.selectedMarketType === '쿠팡'
       const data = {
         partnerName:     form.name.trim(), prefix: form.prefix.trim().toUpperCase(),
         b2bFileName:     form.b2bFile?.name ?? existing?.b2bFileName,
         b2bFileData:     form.fileData || existing?.b2bFileData,
         b2bHeaders:      form.headers.length > 0 ? form.headers : (existing?.b2bHeaders ?? []),
-        marketFileName:  form.marketFile?.name ?? existing?.marketFileName,
-        marketFileData:  form.marketFileData || existing?.marketFileData,
-        marketHeaders:   form.marketHeaders.length > 0 ? form.marketHeaders : (existing?.marketHeaders ?? []),
-        mapping: form.mapping, appendValues: form.appendValues,
+        marketFileName:  isCoupang ? (form.marketFile?.name ?? existing?.marketFileName) : existing?.marketFileName,
+        marketFileData:  isCoupang ? (form.marketFileData || existing?.marketFileData) : existing?.marketFileData,
+        marketHeaders:   isCoupang ? (form.marketHeaders.length > 0 ? form.marketHeaders : (existing?.marketHeaders ?? [])) : (existing?.marketHeaders ?? []),
+        mapping:         isCoupang ? form.mapping : (existing?.mapping ?? {}),
+        appendValues:    isCoupang ? form.appendValues : (existing?.appendValues ?? {}),
+        marketMappings:  newMMs,
       }
       editingId ? updateCoupangPartner(editingId, data) : saveCoupangPartner(data)
     } else {
@@ -336,13 +377,6 @@ export function B2bPartnersPage() {
             <FileSpreadsheet size={15} /> B2B 주문 양식
           </button>
           <button
-            onClick={() => { setTab('invoice'); closeForm() }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${tab === 'invoice' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Store size={15} /> 마켓 송장등록 양식
-          </button>
-          <button
             onClick={() => { setTab('supplier'); closeForm() }}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
               ${tab === 'supplier' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
@@ -351,6 +385,13 @@ export function B2bPartnersPage() {
             {supplierMappingPresets.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">{supplierMappingPresets.length}</span>
             )}
+          </button>
+          <button
+            onClick={() => { setTab('invoice'); closeForm() }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+              ${tab === 'invoice' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <Store size={15} /> 마켓 송장등록 양식
           </button>
         </div>
 
@@ -365,16 +406,16 @@ export function B2bPartnersPage() {
             {tab === 'b2b' ? (
               <>
                 <span className="font-semibold text-primary-400">B2B 주문 양식</span>은 거래처(도매처)에 보내는 발주서예요.
-                <span className="text-red-400">접두어</span>를 등록하면 <span className="text-red-400">업체상품코드</span> 기준으로 <span className="text-slate-300">자동 분류</span>됩니다.
+                <span className="text-red-400">접두어</span>를 등록하면 <span className="text-red-400">업체상품코드</span> 기준으로 <span className="text-slate-300">자동 분류</span>되며, <span className="text-slate-300">컬럼 설정</span>을 저장해두면 매번 자동 적용됩니다.
               </>
             ) : tab === 'invoice' ? (
               <>
                 <span className="font-semibold text-amber-400">마켓 송장등록 양식</span>은 쿠팡·스마트스토어 등 마켓에
-                송장번호를 업로드할 때 쓰는 양식이에요.
+                송장번호를 업로드할 때 쓰는 양식이에요. <span className="text-slate-300">컬럼 설정</span>을 등록하면 결과 파일이 마켓 양식에 맞게 자동 변환됩니다.
               </>
             ) : (
               <>
-                <span className="font-semibold text-amber-400">송장 매칭 프리셋</span>은 거래처별 배송목록 파일 형식을 저장합니다.
+                <span className="font-semibold text-amber-400">송장 매칭 프리셋</span>은 택배번호가 있는 운송장 파일의 <span className="text-slate-300">컬럼 설정</span>을 저장합니다.
                 한 번 등록하면 <span className="text-slate-300">파일 올릴 때 자동 인식 → 자동 실행</span>됩니다.
               </>
             )}
@@ -642,28 +683,59 @@ export function B2bPartnersPage() {
                 )}
               </div>
 
-              {/* 마켓 주문 원본 엑셀 업로드 — B2B 주문 양식 탭에서만 표시 */}
+              {/* 마켓별 주문 원본 엑셀 업로드 — B2B 주문 양식 탭에서만 표시 */}
               {isB2b && (
                 <>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
                       <FileSpreadsheet size={11} className="text-amber-400" />
                       마켓 주문 원본 엑셀
                       <span className="text-slate-600 font-normal">(마켓에서 다운받은 주문서)</span>
                     </label>
-                    {editingId && !form.marketFile && existingMarketFileName ? (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
-                        <CheckCircle2 size={12} />
-                        기존 파일 유지: <span className="font-medium">{existingMarketFileName}</span>
-                        <span className="text-slate-500 ml-1">(새 파일 업로드 시 교체)</span>
-                      </div>
-                    ) : null}
-                    <FileUploader label="" file={form.marketFile} onFileChange={handleMarketFile} compact />
-                    {form.marketHeaders.length > 0 && (
-                      <p className="text-xs text-amber-400/70">
-                        컬럼 {form.marketHeaders.length}개 인식 — 이 컬럼이 매핑 왼쪽(마켓 주문 컬럼)으로 사용됩니다
-                      </p>
-                    )}
+                    {/* 마켓 타입 탭 */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {MARKET_TYPES.map(mt => {
+                        const partner = editingId ? coupangPartners.find(p => p.id === editingId) : null
+                        const hasMM = partner?.marketMappings?.some(m => m.marketType === mt && (m.marketHeaders?.length ?? 0) > 0)
+                        return (
+                          <button
+                            key={mt}
+                            type="button"
+                            onClick={() => handleMarketTypeChange(mt)}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                              ${form.selectedMarketType === mt
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-dark-hover text-slate-400 border-dark-border hover:border-amber-500/30 hover:text-amber-300'}`}
+                          >
+                            {mt}
+                            {hasMM && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* 선택된 마켓의 파일 업로드 */}
+                    {(() => {
+                      const partner = editingId ? coupangPartners.find(p => p.id === editingId) : null
+                      const savedMM = partner?.marketMappings?.find(m => m.marketType === form.selectedMarketType)
+                      const savedFileName = savedMM?.marketFileName
+                      return (
+                        <>
+                          {editingId && !form.marketFile && savedFileName && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+                              <CheckCircle2 size={12} />
+                              기존 파일 유지: <span className="font-medium">{savedFileName}</span>
+                              <span className="text-slate-500 ml-1">(새 파일 업로드 시 교체)</span>
+                            </div>
+                          )}
+                          <FileUploader label="" file={form.marketFile} onFileChange={handleMarketFile} compact />
+                          {form.marketHeaders.length > 0 && (
+                            <p className="text-xs text-amber-400/70">
+                              컬럼 {form.marketHeaders.length}개 인식 — 이 컬럼이 매핑 왼쪽({form.selectedMarketType} 주문 컬럼)으로 사용됩니다
+                            </p>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                   <div className="border-t border-dark-border" />
                 </>
@@ -696,6 +768,7 @@ export function B2bPartnersPage() {
                   b2bFileName={form.b2bFile?.name}
                   b2bFileData={form.fileData}
                   loadedPresetId={form.loadedPresetId ?? undefined}
+                  selectedMarketType={isB2b ? form.selectedMarketType : undefined}
                   mode={isB2b ? 'order' : 'invoice'}
                   onMappingChange={mapping => setForm(f => ({ ...f, mapping }))}
                   onAppendValuesChange={appendValues => setForm(f => ({ ...f, appendValues }))}

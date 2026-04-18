@@ -7,6 +7,7 @@ import { useSettingsStore } from './stores/settingsStore'
 import { isEnabled } from './utils/featureFlags'
 
 import { Sidebar }         from './components/Sidebar'
+import { ChatBubble }      from './components/chat/ChatBubble'
 import { LoginPage }       from './pages/LoginPage'
 import { RegisterPage }    from './pages/RegisterPage'
 import { ActivatePage }    from './pages/ActivatePage'
@@ -41,6 +42,7 @@ function AppLayout() {
           <Route path="*"             element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
+      <ChatBubble />
     </div>
   )
 }

@@ -75,7 +75,11 @@ function SortableConnCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-500 font-mono">{conn.vendorId ?? '업체코드 없음'}</p>
+          <p className="text-xs text-slate-500 font-mono">
+            {conn.marketplace === 'smartstore'
+              ? (conn.hasAccessKey ? 'Client ID 등록됨' : 'Client ID 없음')
+              : (conn.vendorId ?? '업체코드 없음')}
+          </p>
         </div>
 
         {/* 테스트 버튼 */}
@@ -140,30 +144,36 @@ function SortableConnCard({
       {/* 키 편집 패널 */}
       {isOpen && (
         <div className="px-5 pb-5 pt-1 border-t border-primary-500/15 space-y-3 animate-fade-in">
+          {conn.marketplace === 'coupang' && (
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">업체코드 (Vendor ID)</label>
+              <input
+                type="text"
+                value={connEdit.vendorId}
+                onChange={e => onEditChange({ vendorId: e.target.value })}
+                placeholder="A00000000"
+                className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
+              />
+            </div>
+          )}
           <div>
-            <label className="block text-xs text-slate-500 mb-1">업체코드 (Vendor ID)</label>
-            <input
-              type="text"
-              value={connEdit.vendorId}
-              onChange={e => onEditChange({ vendorId: e.target.value })}
-              placeholder="A00000000"
-              className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Access Key</label>
+            <label className="block text-xs text-slate-500 mb-1">
+              {conn.marketplace === 'smartstore' ? 'Client ID' : 'Access Key'}
+            </label>
             <input
               type="text"
               autoComplete="off"
               value={connEdit.accessKey}
               onChange={e => onEditChange({ accessKey: e.target.value })}
-              placeholder="Access Key 입력"
+              placeholder={conn.marketplace === 'smartstore' ? '네이버 커머스 API Client ID' : 'Access Key 입력'}
               className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
             />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-slate-500">Secret Key</label>
+              <label className="text-xs text-slate-500">
+                {conn.marketplace === 'smartstore' ? 'Client Secret' : 'Secret Key'}
+              </label>
               {conn.hasSecretKey && connEdit.secretKey === (conn.secretKeyMask ?? '') && (
                 <span className="text-[10px] text-slate-500">변경하려면 새 키 입력</span>
               )}
@@ -173,7 +183,7 @@ function SortableConnCard({
               autoComplete="off"
               value={connEdit.secretKey}
               onChange={e => onEditChange({ secretKey: e.target.value })}
-              placeholder="Secret Key 입력"
+              placeholder={conn.marketplace === 'smartstore' ? '네이버 커머스 API Client Secret' : 'Secret Key 입력'}
               className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
             />
           </div>

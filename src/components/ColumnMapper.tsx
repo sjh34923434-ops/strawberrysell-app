@@ -1,7 +1,8 @@
 import { useCallback, useState, useMemo, useEffect } from 'react'
 import { ArrowRight, Wand2, CheckCircle2, Save, Trash2, BookOpen, X, PlusCircle, KeyRound } from 'lucide-react'
 import { autoMatchColumns, SEPARATE_DELIVERY_PATTERN, type ColumnMapping } from '../utils/fillMapper'
-import { useSettingsStore } from '../stores/settingsStore'
+import { useSettingsStore, type MarketType } from '../stores/settingsStore'
+import { useAuthStore } from '../stores/authStore'
 
 /**
  * 주문 고유 식별 복합 키 컬럼
@@ -66,6 +67,7 @@ interface Props {
   b2bFileName?:        string
   b2bFileData?:        string   // B2B 파일 base64 (저장 시 함께 포함)
   loadedPresetId?:     string   // 불러온 프리셋 ID (업데이트용)
+  selectedMarketType?: MarketType  // 현재 선택된 마켓 타입 (마켓별 매핑 불러오기용)
   mode?:               'order' | 'invoice'
   onMappingChange:     (mapping: ColumnMapping) => void
   onAppendValuesChange:(appendValues: Record<string, string>) => void
@@ -80,11 +82,14 @@ export function ColumnMapper({
   b2bFileName,
   b2bFileData,
   loadedPresetId,
+  selectedMarketType,
   mode = 'order',
   onMappingChange,
   onAppendValuesChange,
   onPresetLoaded,
 }: Props) {
+  const { user } = useAuthStore()
+  const isAdmin = !!user?.isAdmin
   const [autoResult, setAutoResult]     = useState<number | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [saveMode, setSaveMode]         = useState<'update' | 'new'>('update')
@@ -261,38 +266,65 @@ export function ColumnMapper({
       {/* 거래처 매핑 목록 */}
       {showPresets && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2 animate-fade-in">
-          <p className="text-xs font-medium text-amber-400 mb-2">거래처 매핑</p>
+          <p className="text-xs font-medium text-amber-400 mb-2">
+            거래처 매핑{selectedMarketType ? ` — ${selectedMarketType}` : ''}
+          </p>
           {coupangPartners.length === 0 ? (
             <p className="text-xs text-slate-500 py-2 text-center">거래처관리에서 거래처를 등록하세요</p>
           ) : (
-            coupangPartners.map((partner) => (
-              <div
-                key={partner.id}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50 border border-dark-border dark:border-dark-border border-gray-200 hover:border-amber-500/30 transition-colors group"
-              >
-                <button
-                  onClick={() => handleApplyPreset(partner.id, partner.mapping, partner.appendValues)}
-                  className="flex-1 text-center"
+            coupangPartners.map((partner) => {
+              const mm = selectedMarketType
+                ? partner.marketMappings?.find(m => m.marketType === selectedMarketType)
+                : undefined
+              const hasMarketMapping = selectedMarketType ? !!mm : true
+              return (
+                <div
+                  key={partner.id}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors
+                    ${hasMarketMapping
+                      ? 'bg-dark-hover dark:bg-dark-hover bg-gray-50 border-dark-border dark:border-dark-border border-gray-200 hover:border-amber-500/30 group'
+                      : 'bg-dark-surface/40 border-dark-border/40 opacity-60 cursor-not-allowed'}`}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <p className="text-sm font-medium text-slate-200 dark:text-slate-200 text-gray-800 group-hover:text-amber-300 transition-colors">
-                      {partner.partnerName}
-                    </p>
-                    {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 border border-primary-500/30">{partner.prefix}</span>}
-                    <span className="text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30 group-hover:bg-red-500/25 transition-colors whitespace-nowrap">
-                      클릭 적용
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {partner.b2bFileName && `${partner.b2bFileName} · `}
-                    {Object.values(partner.mapping).filter(Boolean).length}개 매핑
-                    {partner.appendValues && Object.values(partner.appendValues).filter(Boolean).length > 0
-                      ? ` · 추가텍스트 ${Object.values(partner.appendValues).filter(Boolean).length}개`
-                      : ''}
-                  </p>
-                </button>
-              </div>
-            ))
+                  {hasMarketMapping ? (
+                    <button
+                      onClick={() => handleApplyPreset(partner.id, mm?.mapping ?? partner.mapping, mm?.appendValues ?? partner.appendValues)}
+                      className="flex-1 text-center"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <p className="text-sm font-medium text-slate-200 dark:text-slate-200 text-gray-800 group-hover:text-amber-300 transition-colors">
+                          {partner.partnerName}
+                        </p>
+                        {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-400 border border-primary-500/30">{partner.prefix}</span>}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 whitespace-nowrap">
+                          매핑 있음
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30 group-hover:bg-red-500/25 transition-colors whitespace-nowrap">
+                          클릭 적용
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {partner.b2bFileName && `${partner.b2bFileName} · `}
+                        {Object.values(mm?.mapping ?? partner.mapping).filter(Boolean).length}개 매핑
+                        {Object.values(mm?.appendValues ?? partner.appendValues ?? {}).filter(Boolean).length > 0
+                          ? ` · 추가텍스트 ${Object.values(mm?.appendValues ?? partner.appendValues ?? {}).filter(Boolean).length}개`
+                          : ''}
+                      </p>
+                    </button>
+                  ) : (
+                    <div className="flex-1 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <p className="text-sm font-medium text-slate-500">{partner.partnerName}</p>
+                        {partner.prefix && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 border border-slate-500/20">{partner.prefix}</span>}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-red-500/10 text-red-500 border-red-500/20 whitespace-nowrap">
+                          {selectedMarketType} 매핑 없음
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">거래처관리에서 {selectedMarketType} 탭 매핑을 먼저 저장하세요</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
       )}
@@ -321,8 +353,8 @@ export function ColumnMapper({
         )}
       </div>
 
-      {/* 🔑 식별 키 컬럼 매핑 현황 */}
-      {mode === 'order' && (() => {
+      {/* 🔑 식별 키 컬럼 매핑 현황 — 관리자 전용 */}
+      {isAdmin && mode === 'order' && (() => {
         const identityMapped = [...ORDER_IDENTITY_COLUMNS].filter(
           col => Object.values(mapping).includes(col) || orderHeaders.includes(col) && mapping[
             b2bHeaders.find(h => mapping[h] === col) ?? ''
@@ -467,7 +499,7 @@ export function ColumnMapper({
                         </option>
                         {sortedOrderHeaders.map((h) => (
                           <option key={h} value={h} className="bg-dark-card dark:bg-dark-card bg-white">
-                            {ORDER_IDENTITY_COLUMNS.has(h) ? `🔑 ${h}` : h}
+                            {isAdmin && ORDER_IDENTITY_COLUMNS.has(h) ? `🔑 ${h}` : h}
                           </option>
                         ))}
                       </select>
