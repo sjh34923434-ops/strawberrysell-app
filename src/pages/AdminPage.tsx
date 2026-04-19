@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck } from 'lucide-react'
+import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck, Ban, ShieldCheck } from 'lucide-react'
 import { api } from '../api/client'
 
 interface License {
@@ -14,8 +14,10 @@ interface License {
 interface User {
   id:              string
   email:           string
+  name:            string | null
+  phone:           string | null
   is_admin:        boolean
-  status:          string   // 'pending' | 'active'
+  status:          string
   created_at:      string
   license_key:     string | null
   license_expires: string | null
@@ -26,6 +28,56 @@ interface Stats {
   totalLicenses:   number
   activeLicenses:  number
   expiredLicenses: number
+  monthlyUsers:    { month: string; users: string }[]
+  monthlyLicenses: { month: string; licenses: string }[]
+  monthlyActive:   { month: string; licenses: string }[]
+  monthlyExpired:  { month: string; licenses: string }[]
+}
+
+function BarChart({ data, color, label }: {
+  data: { month: string; value: number }[]
+  color: string
+  label: string
+}) {
+  const max = Math.max(...data.map(d => d.value), 1)
+  const W = 480, H = 120, PAD = 32, BAR_GAP = 8
+  const barW = (W - PAD * 2 - BAR_GAP * (data.length - 1)) / data.length
+
+  return (
+    <div>
+      <p className="text-xs text-slate-400 mb-2">{label}</p>
+      <svg viewBox={`0 0 ${W} ${H + 24}`} className="w-full">
+        {data.map((d, i) => {
+          const barH = max === 0 ? 0 : Math.max((d.value / max) * H, d.value > 0 ? 4 : 0)
+          const x = PAD + i * (barW + BAR_GAP)
+          const y = H - barH
+          return (
+            <g key={d.month}>
+              <rect x={x} y={y} width={barW} height={barH} rx={3} className={color} opacity={0.8} />
+              {d.value > 0 && (
+                <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} className="fill-slate-400">{d.value}</text>
+              )}
+              <text x={x + barW / 2} y={H + 16} textAnchor="middle" fontSize={9} className="fill-slate-500">
+                {d.month.slice(5)}월
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function buildMonthly(rows: { month: string; [key: string]: string }[], key: string): { month: string; value: number }[] {
+  const result: { month: string; value: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const found = rows.find(r => r.month === m)
+    result.push({ month: m, value: found ? Number(found[key]) : 0 })
+  }
+  return result
 }
 
 export function AdminPage() {
@@ -35,6 +87,9 @@ export function AdminPage() {
   const [stats,     setStats]     = useState<Stats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error,     setError]     = useState<string | null>(null)
+  const [betaMode,    setBetaMode]    = useState<boolean | null>(null)
+  const [betaSaving,  setBetaSaving]  = useState(false)
+  const [activeChart, setActiveChart] = useState<'users' | 'licenses' | 'active' | 'expired'>('users')
 
   // 라이선스 발급 폼
   const [plan,  setPlan]  = useState('1month')
@@ -61,7 +116,23 @@ export function AdminPage() {
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+    api.get<{ betaMode: boolean }>('/admin/beta-mode')
+      .then(r => setBetaMode(r.data.betaMode))
+      .catch(() => {})
+  }, [loadData])
+
+  const toggleBetaMode = async () => {
+    if (betaMode === null) return
+    setBetaSaving(true)
+    try {
+      const { data } = await api.patch<{ betaMode: boolean }>('/admin/beta-mode', { betaMode: !betaMode })
+      setBetaMode(data.betaMode)
+    } finally {
+      setBetaSaving(false)
+    }
+  }
 
   const createLicenses = async () => {
     try {
@@ -93,6 +164,17 @@ export function AdminPage() {
     await loadData()
   }
 
+  const banUser = async (id: string) => {
+    if (!confirm('계정을 정지하시겠습니까? 즉시 로그아웃 처리됩니다.')) return
+    await api.patch(`/admin/users/${id}/ban`)
+    await loadData()
+  }
+
+  const unbanUser = async (id: string) => {
+    await api.patch(`/admin/users/${id}/unban`)
+    await loadData()
+  }
+
   const copyKey = (key: string) => {
     navigator.clipboard.writeText(key)
     setCopied(key)
@@ -115,21 +197,65 @@ export function AdminPage() {
         </div>
       )}
 
+      {/* 베타모드 토글 */}
+      <div className="bg-dark-card border border-dark-border rounded-xl p-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-200">베타 모드</p>
+          <p className="text-xs text-slate-500 mt-0.5">ON이면 모든 플랜 무료 표시, 결제 버튼 숨김</p>
+        </div>
+        <button
+          onClick={toggleBetaMode}
+          disabled={betaSaving || betaMode === null}
+          className={`relative w-12 h-6 rounded-full transition-all duration-200 ${
+            betaMode ? 'bg-emerald-500' : 'bg-dark-muted'
+          } disabled:opacity-50`}
+        >
+          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
+            betaMode ? 'left-7' : 'left-1'
+          }`} />
+        </button>
+      </div>
+
       {/* 통계 */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: '전체 사용자', value: stats.totalUsers, color: 'text-blue-400' },
-            { label: '발급 라이선스', value: stats.totalLicenses, color: 'text-purple-400' },
-            { label: '활성 라이선스', value: stats.activeLicenses, color: 'text-green-400' },
-            { label: '만료 라이선스', value: stats.expiredLicenses, color: 'text-red-400' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-dark-card border border-dark-border rounded-xl p-4">
-              <p className="text-xs text-slate-500">{label}</p>
-              <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+        <>
+          <div>
+            <p className="text-xs text-slate-500 mb-2">이번 달 현황 — 클릭하면 그래프로 확인</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { key: 'users',    label: '신규 사용자',   value: stats.totalUsers,      color: 'text-blue-400',   ring: 'ring-blue-500/50',   bg: 'bg-blue-500/10' },
+                { key: 'licenses', label: '발급 라이선스', value: stats.totalLicenses,   color: 'text-purple-400', ring: 'ring-purple-500/50', bg: 'bg-purple-500/10' },
+                { key: 'active',   label: '활성 라이선스', value: stats.activeLicenses,  color: 'text-green-400',  ring: 'ring-green-500/50',  bg: 'bg-green-500/10' },
+                { key: 'expired',  label: '만료 라이선스', value: stats.expiredLicenses, color: 'text-red-400',    ring: 'ring-red-500/50',    bg: 'bg-red-500/10' },
+              ].map(({ key, label, value, color, ring, bg }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveChart(key as any)}
+                  className={`text-left rounded-xl p-4 border transition-all ${
+                    activeChart === key
+                      ? `${bg} border-transparent ring-2 ${ring}`
+                      : 'bg-dark-card border-dark-border hover:border-slate-600'
+                  }`}
+                >
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+
+          {/* 월별 그래프 */}
+          <div className="bg-dark-card border border-dark-border rounded-xl p-5">
+            {activeChart === 'users' && <BarChart label="월별 신규 사용자 (최근 6개월)" color="fill-blue-400"
+              data={buildMonthly(stats.monthlyUsers, 'users')} />}
+            {activeChart === 'licenses' && <BarChart label="월별 발급 라이선스 (최근 6개월)" color="fill-purple-400"
+              data={buildMonthly(stats.monthlyLicenses, 'licenses')} />}
+            {activeChart === 'active' && <BarChart label="월별 활성 라이선스 (최근 6개월)" color="fill-green-400"
+              data={buildMonthly(stats.monthlyActive, 'licenses')} />}
+            {activeChart === 'expired' && <BarChart label="월별 만료 라이선스 (최근 6개월)" color="fill-red-400"
+              data={buildMonthly(stats.monthlyExpired, 'licenses')} />}
+          </div>
+        </>
       )}
 
       {/* 탭 */}
@@ -172,6 +298,7 @@ export function AdminPage() {
                   <option value="1month_free">1개월 무료</option>
                   <option value="1month">1개월</option>
                   <option value="3month">3개월</option>
+                  <option value="6month">6개월</option>
                   <option value="12month">12개월</option>
                   <option value="unlimited">무제한</option>
                 </select>
@@ -263,7 +390,9 @@ export function AdminPage() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-dark-border">
+                <th className="text-left px-4 py-3 text-slate-400 font-medium">이름</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">이메일</th>
+                <th className="text-left px-4 py-3 text-slate-400 font-medium">전화번호</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">상태</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">라이선스 만료</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">가입일</th>
@@ -274,14 +403,16 @@ export function AdminPage() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-b border-dark-border/50 hover:bg-dark-hover/50 transition-colors">
+                  <td className="px-4 py-3 text-slate-200">{user.name ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-200">{user.email}</td>
+                  <td className="px-4 py-3 text-slate-400">{user.phone ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      user.status === 'active'
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-yellow-500/20 text-yellow-400'
+                      user.status === 'active'  ? 'bg-green-500/20 text-green-400' :
+                      user.status === 'banned'  ? 'bg-red-500/20 text-red-400' :
+                      'bg-yellow-500/20 text-yellow-400'
                     }`}>
-                      {user.status === 'active' ? '활성' : '대기중'}
+                      {user.status === 'active' ? '활성' : user.status === 'banned' ? '정지' : '대기중'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-400">
@@ -302,6 +433,16 @@ export function AdminPage() {
                       {!user.is_admin && user.status === 'pending' && (
                         <button onClick={() => approveUser(user.id)} title="승인" className="text-slate-500 hover:text-green-400 transition-colors">
                           <UserCheck size={13} />
+                        </button>
+                      )}
+                      {!user.is_admin && user.status !== 'banned' && (
+                        <button onClick={() => banUser(user.id)} title="정지" className="text-slate-500 hover:text-orange-400 transition-colors">
+                          <Ban size={13} />
+                        </button>
+                      )}
+                      {!user.is_admin && user.status === 'banned' && (
+                        <button onClick={() => unbanUser(user.id)} title="정지 해제" className="text-slate-500 hover:text-green-400 transition-colors">
+                          <ShieldCheck size={13} />
                         </button>
                       )}
                       {!user.is_admin && (

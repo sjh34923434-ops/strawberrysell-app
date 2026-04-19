@@ -46,11 +46,14 @@ api.interceptors.response.use(
 
     isRefreshing = true
     try {
-      const stored = await window.electron?.store?.get('refreshToken') as string | undefined
+      const stored = (window.electron?.store
+        ? await window.electron.store.get('refreshToken')
+        : localStorage.getItem('refreshToken')) as string | undefined
       if (!stored) throw new Error('no token')
       const { data } = await api.post<{ accessToken: string; refreshToken: string }>('/auth/refresh', { refreshToken: stored })
       sessionStorage.setItem('accessToken', data.accessToken)
-      await window.electron?.store?.set('refreshToken', data.refreshToken)
+      if (window.electron?.store) await window.electron.store.set('refreshToken', data.refreshToken)
+      else localStorage.setItem('refreshToken', data.refreshToken)
       pendingQueue.forEach(p => p.resolve(data.accessToken))
       pendingQueue = []
       originalConfig.headers!.Authorization = `Bearer ${data.accessToken}`
@@ -120,9 +123,9 @@ export const authApi = {
     return data
   },
 
-  signup: async (email: string, password: string, deviceId?: string) => {
+  signup: async (email: string, password: string, deviceId?: string, name?: string, phone?: string) => {
     try {
-      const { data } = await api.post<{ message: string }>('/auth/signup', { email, password, deviceId })
+      const { data } = await api.post<{ message: string }>('/auth/signup', { email, password, deviceId, name, phone })
       return data
     } catch (err) {
       throw new Error(parseError(err))

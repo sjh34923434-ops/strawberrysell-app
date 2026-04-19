@@ -12,7 +12,7 @@ import {
 import * as XLSX from 'xlsx'
 import { useBusinessStore } from '../stores/businessStore'
 import { useSettingsStore, type MarketType } from '../stores/settingsStore'
-import { coupangApi, naverApi } from '../api/client'
+import { api, coupangApi, naverApi } from '../api/client'
 import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { fillB2bFromOrder } from '../utils/fillMapper'
 
@@ -28,12 +28,12 @@ const STEPS = [
 ] as const
 
 const ORDER_STATUSES = [
-  { value: 'ALL',        label: '전체' },
   { value: 'ACCEPT',     label: '신규주문' },
   { value: 'INSTRUCT',   label: '상품준비중' },
   { value: 'DEPARTURE',  label: '배송지시' },
   { value: 'DELIVERING', label: '배송중' },
   { value: 'FINAL_DELIVERY', label: '배송완료' },
+  { value: 'ALL',        label: '전체' },
 ] as const
 
 const CARRIER_MAP: Record<string, string> = {
@@ -143,14 +143,17 @@ export function CoupangAutoPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('match')
   const [selectedMarket, setSelectedMarket] = useState<MarketType | null>(null)
+  const connTestStatus: Record<string, string> = (() => {
+    try { return JSON.parse(localStorage.getItem('conn-test-status') ?? '{}') } catch { return {} }
+  })()
 
   // ── 주문 매칭 상태 ──────────────────────────────────────────────────────────
   const [step,           setStep]           = useState<Step>(1)
   const [selectedBizId,  setSelectedBizId]  = useState<string>('')
   const [selectedConnId, setSelectedConnId] = useState<string>('')
-  const [orderStatus,    setOrderStatus]    = useState<string>('ALL')
-  const [startDate,      setStartDate]      = useState<string>(() => new Date().toISOString().split('T')[0])
-  const [endDate,        setEndDate]        = useState<string>(() => new Date().toISOString().split('T')[0])
+  const [orderStatus,    setOrderStatus]    = useState<string>('ACCEPT')
+  const [startDate,      setStartDate]      = useState<string>(() => { const d = new Date(); d.setDate(d.getDate() - 4); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
+  const [endDate,        setEndDate]        = useState<string>(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [isFetching,     setIsFetching]     = useState(false)
   const [fetchProgress,  setFetchProgress]  = useState(0)
   const [fetchedOrders,  setFetchedOrders]  = useState<any[] | null>(null)
@@ -159,6 +162,8 @@ export function CoupangAutoPage() {
   const [isMatching,       setIsMatching]        = useState(false)
   const [matchResult,      setMatchResult]       = useState<Record<string, any[]>>({})
   const [showOrderList,    setShowOrderList]     = useState(false)
+  const [isAcknowledging,  setIsAcknowledging]  = useState(false)
+  const [ackResult,        setAckResult]         = useState<string | null>(null)
 
 
 
@@ -174,6 +179,21 @@ export function CoupangAutoPage() {
       ),
       })).filter(b => b.marketConns.length > 0)
     : []
+
+  // 사업자 목록 로드 후 첫 번째 사업자 자동 선택
+  useEffect(() => {
+    if (!selectedMarket || selectedBizId) return
+    const list = businesses
+      .map(b => ({ ...b, marketConns: b.connections.filter(c =>
+        c.marketplace === MARKET_CONN_KEY[selectedMarket] &&
+        (MARKET_CONN_KEY[selectedMarket] === 'coupang' ? !!c.vendorId : c.hasAccessKey)
+      )}))
+      .filter(b => b.marketConns.length > 0)
+    if (list.length > 0) {
+      setSelectedBizId(list[0].id)
+      setSelectedConnId(list[0].marketConns[0]?.id ?? '')
+    }
+  }, [businesses, selectedMarket, selectedBizId])
 
   const handleBizChange = (bizId: string) => {
     setSelectedBizId(bizId)
@@ -217,6 +237,32 @@ export function CoupangAutoPage() {
     }
   }
 
+  // ── 발주확인처리 (신규주문 → 상품준비중) ──────────────────────────────────
+  const handleAcknowledge = async () => {
+    if (!fetchedOrders || !selectedBizId || !selectedConnId) return
+    const acceptOrders = fetchedOrders.filter(o => o['주문상태'] === '신규주문')
+    if (acceptOrders.length === 0) { setAckResult('발주확인할 신규주문이 없습니다.'); return }
+
+    setIsAcknowledging(true)
+    setAckResult(null)
+    try {
+      const body = acceptOrders.map(o => ({
+        orderId:     String(o['주문번호']),
+        orderItemId: String(o['주문상품번호']),
+        vendorItemId: String(o['업체상품코드']),
+      }))
+      await api.post(
+        `/businesses/${selectedBizId}/connections/${selectedConnId}/coupang/acknowledge`,
+        body
+      )
+      setAckResult(`✅ ${acceptOrders.length}건 발주확인 완료! 주문 상태가 상품준비중으로 변경됩니다.`)
+    } catch (err: any) {
+      setAckResult(`❌ ${err.response?.data?.message ?? err.message}`)
+    } finally {
+      setIsAcknowledging(false)
+    }
+  }
+
   // ── 접두어 앞 2글자 기반 자동 매칭 (일괄매칭과 동일 로직) ──
   const handleMatch = async () => {
     setIsMatching(true)
@@ -224,7 +270,7 @@ export function CoupangAutoPage() {
 
     if (!fetchedOrders) { setIsMatching(false); return }
 
-    const matchableOrders = fetchedOrders.filter(o => o['주문상태'] === '상품준비중')
+    const matchableOrders = fetchedOrders  // 모든 상태 매칭
     const result: Record<string, any[]> = {}
 
     for (const order of matchableOrders) {
@@ -297,7 +343,7 @@ export function CoupangAutoPage() {
   const orderColumns    = fetchedOrders?.length ? Object.keys(fetchedOrders[0]) : []
   const recommendedCols = orderColumns.filter(c => RECOMMENDED_CLASSIFY_COLS.includes(c))
   const otherCols       = orderColumns.filter(c => !RECOMMENDED_CLASSIFY_COLS.includes(c))
-  const today           = new Date().toISOString().split('T')[0]
+  const today           = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
 
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
 
@@ -350,7 +396,9 @@ export function CoupangAutoPage() {
                 {MARKET_CARDS.map(({ type, color, bg, border }) => {
                   const connKey = MARKET_CONN_KEY[type]
                   const isConnected = businesses.some(b => b.connections.some(c =>
-                    c.marketplace === connKey && (connKey === 'coupang' ? !!c.vendorId : c.hasAccessKey)
+                    c.marketplace === connKey &&
+                    (connKey === 'coupang' ? !!c.vendorId : c.hasAccessKey) &&
+                    connTestStatus[c.id] === 'ok'
                   ))
                   return (
                     <button
@@ -364,7 +412,7 @@ export function CoupangAutoPage() {
                           ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                           : 'bg-slate-500/15 text-slate-500 border-slate-500/20'
                       }`}>
-                        {isConnected ? '연동됨' : '미연동'}
+                        {isConnected ? 'API ON' : 'API OFF'}
                       </span>
                       <div className={`w-14 h-14 rounded-xl ${bg} border ${border} flex items-center justify-center`}>
                         <Store size={26} className={color} />
@@ -517,9 +565,36 @@ export function CoupangAutoPage() {
                   💡 거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해야 적용됩니다.
                 </p>
 
+                {/* 발주확인처리 (신규주문 있을 때) */}
+                {fetchedOrders !== null && fetchedOrders.some(o => o['주문상태'] === '신규주문') && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2.5">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-300">신규주문 {fetchedOrders.filter(o => o['주문상태'] === '신규주문').length}건 — 발주확인 필요</p>
+                        <p className="text-xs text-amber-400/70 mt-0.5">쿠팡 셀러에서 '발주확인처리'를 해야 상품준비중으로 변경됩니다.<br />아래 버튼으로 API를 통해 자동 처리할 수 있습니다.</p>
+                      </div>
+                    </div>
+                    {ackResult && (
+                      <p className="text-xs px-2 py-1.5 rounded-lg bg-dark-hover text-slate-300">{ackResult}</p>
+                    )}
+                    <button
+                      onClick={handleAcknowledge}
+                      disabled={isAcknowledging}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50 transition-all"
+                    >
+                      {isAcknowledging ? <><Loader2 size={13} className="animate-spin" /> 처리 중...</> : '발주확인처리 (API 자동)'}
+                    </button>
+                  </div>
+                )}
+
                 {fetchError && (
-                  <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 whitespace-pre-line">
-                    <AlertCircle size={13} className="shrink-0 mt-0.5" /> {fetchError}
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                    <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-400">API 연결 안됨</p>
+                      <p className="text-xs text-red-400/70 mt-0.5 whitespace-pre-line">{fetchError}</p>
+                    </div>
                   </div>
                 )}
 

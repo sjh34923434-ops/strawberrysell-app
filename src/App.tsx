@@ -8,6 +8,7 @@ import { isEnabled } from './utils/featureFlags'
 
 import { Sidebar }         from './components/Sidebar'
 import { ChatBubble }      from './components/chat/ChatBubble'
+import { UpdateBanner }    from './components/UpdateBanner'
 import { LoginPage }       from './pages/LoginPage'
 import { RegisterPage }    from './pages/RegisterPage'
 import { ActivatePage }    from './pages/ActivatePage'
@@ -27,6 +28,7 @@ import { B2bPartnersPage } from './pages/B2bPartnersPage'
 function AppLayout() {
   return (
     <div className="flex min-h-screen bg-dark-bg dark:bg-dark-bg bg-gray-50">
+      <UpdateBanner />
       <Sidebar />
       <main className="flex flex-col flex-1 min-w-0">
         <Routes>

@@ -20,6 +20,22 @@ interface AuthState {
   activate:  (licenseKey: string) => Promise<void>
 }
 
+// Electron store 없으면 localStorage 폴백
+const tokenStore = {
+  get: async (key: string): Promise<string | undefined> => {
+    if (window.electron?.store) return window.electron.store.get(key) as Promise<string | undefined>
+    return localStorage.getItem(key) ?? undefined
+  },
+  set: async (key: string, value: string): Promise<void> => {
+    if (window.electron?.store) return window.electron.store.set(key, value)
+    localStorage.setItem(key, value)
+  },
+  delete: async (key: string): Promise<void> => {
+    if (window.electron?.store) return window.electron.store.delete(key)
+    localStorage.removeItem(key)
+  },
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user:            null,
   isAuthenticated: false,
@@ -30,7 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const { refreshToken } = await authApi.login(email, password)
-      await window.electron.store.set('refreshToken', refreshToken)
+      await tokenStore.set('refreshToken', refreshToken)
       const user = await authApi.me()
       set({ user, isAuthenticated: true, isLoading: false })
     } catch (err) {
@@ -46,7 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (!useAuthStore.getState().isAuthenticated) return
     set({ user: null, isAuthenticated: false })
     await authApi.logout()
-    await window.electron.store.delete('refreshToken')
+    await tokenStore.delete('refreshToken')
   },
 
   checkAuth: async () => {
@@ -55,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       setTimeout(() => reject(new Error('timeout')), 5000)
     )
     try {
-      const storedToken = await window.electron.store.get('refreshToken') as string | undefined
+      const storedToken = await tokenStore.get('refreshToken')
       if (!storedToken) {
         set({ isLoading: false })
         return
@@ -64,13 +80,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         authApi.refreshToken(storedToken),
         timeout,
       ])
-      await window.electron.store.set('refreshToken', newRefresh)
+      await tokenStore.set('refreshToken', newRefresh)
       const user = await authApi.me()
       set({ user, isAuthenticated: true, isLoading: false })
     } catch (err: unknown) {
-      // 타임아웃은 토큰 유지 (서버 느린 것), 인증 실패(401)만 토큰 삭제
       if (!(err instanceof Error) || err.message !== 'timeout') {
-        await window.electron.store.delete('refreshToken')
+        await tokenStore.delete('refreshToken')
       }
       set({ isLoading: false })
     }

@@ -92,8 +92,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-org",
-      "repo": "strawberrysell"
+      "owner": "sjh34923434-ops",
+      "repo": "strawberrysell-app"
     }
   }
 }

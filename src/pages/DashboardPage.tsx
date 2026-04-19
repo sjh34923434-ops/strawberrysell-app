@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { GitMerge, Layers, Truck, ArrowRight, Key, Clock, CheckCircle2, TrendingUp, ShoppingCart } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useLicenseStore } from '../stores/licenseStore'
+import { OnboardingChecklist } from '../components/OnboardingChecklist'
 
 function StatCard({
   label,
@@ -62,16 +63,8 @@ export function DashboardPage() {
           </p>
         </div>
 
-        {/* 처음 이용 안내 */}
-        <div className="flex items-start gap-3 px-4 py-4 rounded-xl bg-red-500/10 border border-red-500/30">
-          <span className="text-red-400 font-bold text-lg shrink-0">★</span>
-          <div>
-            <p className="text-sm font-bold text-red-400">처음 이용 시 가장 먼저 할 일!!</p>
-            <p className="text-sm text-red-300/90 mt-1 leading-relaxed">
-              거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해 주세요!
-            </p>
-          </div>
-        </div>
+        {/* 온보딩 체크리스트 */}
+        <OnboardingChecklist />
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

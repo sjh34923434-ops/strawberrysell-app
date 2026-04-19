@@ -210,8 +210,12 @@ export function BusinessesPage() {
   const [activeId,      setActiveId]      = useState<string | null>(null)
   const [showAddBiz,    setShowAddBiz]    = useState(false)
   const [showAddConn,   setShowAddConn]   = useState(false)
-  const [testStatus,    setTestStatus]    = useState<Record<string, TestStatus>>({})
-  const [testError,     setTestError]     = useState<Record<string, string>>({})
+  const [testStatus,    setTestStatus]    = useState<Record<string, TestStatus>>(() => {
+    try { return JSON.parse(localStorage.getItem('conn-test-status') ?? '{}') } catch { return {} }
+  })
+  const [testError,     setTestError]     = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('conn-test-error') ?? '{}') } catch { return {} }
+  })
   const [editingBizId,  setEditingBizId]  = useState<string | null>(null)
   const [editName,      setEditName]      = useState('')
   const [expandedConn,  setExpandedConn]  = useState<string | null>(null)
@@ -302,13 +306,29 @@ export function BusinessesPage() {
     setTestError(s => { const n = { ...s }; delete n[connId]; return n })
     try {
       const res = await testConnection(activeId, connId)
-      setTestStatus(s => ({ ...s, [connId]: res.ok ? 'ok' : 'fail' }))
+      setTestStatus(s => {
+        const next = { ...s, [connId]: res.ok ? 'ok' as TestStatus : 'fail' as TestStatus }
+        localStorage.setItem('conn-test-status', JSON.stringify(next))
+        return next
+      })
       if (!res.ok && res.message) {
-        setTestError(s => ({ ...s, [connId]: res.message }))
+        setTestError(s => {
+          const next = { ...s, [connId]: res.message }
+          localStorage.setItem('conn-test-error', JSON.stringify(next))
+          return next
+        })
       }
     } catch (err: any) {
-      setTestStatus(s => ({ ...s, [connId]: 'fail' }))
-      setTestError(s => ({ ...s, [connId]: err?.message ?? '알 수 없는 오류' }))
+      setTestStatus(s => {
+        const next = { ...s, [connId]: 'fail' as TestStatus }
+        localStorage.setItem('conn-test-status', JSON.stringify(next))
+        return next
+      })
+      setTestError(s => {
+        const next = { ...s, [connId]: err?.message ?? '알 수 없는 오류' }
+        localStorage.setItem('conn-test-error', JSON.stringify(next))
+        return next
+      })
     }
   }
 

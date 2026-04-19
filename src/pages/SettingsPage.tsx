@@ -1,26 +1,31 @@
 import React, { useState } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
 
-function Section({ title, icon: Icon, children }: {
-  title:    string
-  icon:     React.ElementType
-  children: React.ReactNode
+function Section({ title, icon: Icon, children, collapsible = false, defaultOpen = true }: {
+  title:        string
+  icon:         React.ElementType
+  children:     React.ReactNode
+  collapsible?: boolean
+  defaultOpen?: boolean
 }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="
-      bg-dark-card dark:bg-dark-card bg-white
-      border border-dark-border dark:border-dark-border border-gray-200
-      rounded-2xl overflow-hidden
-    ">
-      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-dark-border dark:border-dark-border border-gray-100">
+    <div className="bg-dark-card dark:bg-dark-card bg-white border border-dark-border dark:border-dark-border border-gray-200 rounded-2xl overflow-hidden">
+      <div
+        className={`flex items-center gap-2.5 px-5 py-4 border-b border-dark-border dark:border-dark-border border-gray-100 ${collapsible ? 'cursor-pointer select-none hover:bg-dark-hover transition-colors' : ''}`}
+        onClick={() => collapsible && setOpen(v => !v)}
+      >
         <Icon size={16} className="text-primary-400" />
-        <h2 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-200 dark:text-slate-200 text-gray-800 flex-1">{title}</h2>
+        {collapsible && (
+          <ChevronDown size={15} className={`text-slate-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        )}
       </div>
-      <div className="px-5 py-5">{children}</div>
+      {(!collapsible || open) && <div className="px-5 py-5">{children}</div>}
     </div>
   )
 }
@@ -95,7 +100,7 @@ export function SettingsPage() {
         </div>
 
         {/* 화면 설정 */}
-        <Section title="화면 설정" icon={Type}>
+        <Section title="화면 설정" icon={Type} collapsible defaultOpen={false}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">글씨 크기</p>
@@ -135,80 +140,8 @@ export function SettingsPage() {
           </div>
         </Section>
 
-        {/* 내보내기 파일명 설정 */}
-        <Section title="내보내기 파일명 설정" icon={FileText}>
-          {(() => {
-            const now = new Date()
-            const pad = (n: number) => String(n).padStart(2, '0')
-            const y = now.getFullYear()
-            const mo = pad(now.getMonth() + 1)
-            const d = pad(now.getDate())
-            const h = pad(now.getHours())
-            const mi = pad(now.getMinutes())
-            const s = pad(now.getSeconds())
-            const suffix =
-              fileNameDateFormat === 'YYYYMMDD'       ? `${y}${mo}${d}` :
-              fileNameDateFormat === 'YYYY-MM-DD'     ? `${y}-${mo}-${d}` :
-              `${y}${mo}${d}_${h}${mi}${s}`
-            const preview = fileNameDateEnabled ? `거래처명_${suffix}.xlsx` : '거래처명.xlsx'
-            return (
-              <div className="space-y-4">
-                {/* 날짜 추가 토글 */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">파일명에 날짜/시간 자동 추가</p>
-                    <p className="text-xs text-slate-500 mt-0.5">B2B 사이트 업로드 시 파일명 중복 방지</p>
-                  </div>
-                  <button
-                    onClick={() => setFileNameDateEnabled(!fileNameDateEnabled)}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${fileNameDateEnabled ? 'bg-primary-500' : 'bg-dark-muted'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${fileNameDateEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                {/* 포맷 선택 */}
-                {fileNameDateEnabled && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-400">날짜 포맷</p>
-                    <div className="space-y-1.5">
-                      {([
-                        { value: 'YYYYMMDD_HHmmss', label: 'YYYYMMDD_HHmmss', desc: '날짜 + 시간 (권장)' },
-                        { value: 'YYYYMMDD',        label: 'YYYYMMDD',        desc: '날짜만' },
-                        { value: 'YYYY-MM-DD',      label: 'YYYY-MM-DD',      desc: '날짜만 (구분자 포함)' },
-                      ] as { value: FileNameDateFormat; label: string; desc: string }[]).map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setFileNameDateFormat(opt.value)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                            fileNameDateFormat === opt.value
-                              ? 'bg-primary-500/10 border-primary-500/40 text-primary-300'
-                              : 'bg-dark-hover border-dark-border text-slate-400 hover:border-slate-500'
-                          }`}
-                        >
-                          <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${fileNameDateFormat === opt.value ? 'border-primary-400 bg-primary-400' : 'border-slate-600'}`} />
-                          <div>
-                            <span className="text-xs font-mono font-semibold">{opt.label}</span>
-                            <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 미리보기 */}
-                <div className="px-3 py-2.5 rounded-xl bg-dark-hover border border-dark-border">
-                  <p className="text-xs text-slate-500 mb-1">파일명 미리보기</p>
-                  <p className="text-sm font-mono text-primary-300">{preview}</p>
-                </div>
-              </div>
-            )
-          })()}
-        </Section>
-
         {/* 계정 정보 */}
-        <Section title="계정 정보" icon={User}>
+        <Section title="계정 정보" icon={User} collapsible defaultOpen={false}>
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between py-2 border-b border-dark-border dark:border-dark-border border-gray-100">
               <span className="text-slate-500">이메일</span>
@@ -222,7 +155,7 @@ export function SettingsPage() {
         </Section>
 
         {/* 라이선스 */}
-        <Section title="라이선스" icon={Key}>
+        <Section title="라이선스" icon={Key} collapsible defaultOpen={false}>
           <div className="space-y-4">
             {isActivated && licenseKey ? (
               <div className="space-y-3 text-sm">
@@ -302,7 +235,7 @@ export function SettingsPage() {
         </Section>
 
         {/* 매칭 설정 */}
-        <Section title="매칭 기본 설정" icon={Shield}>
+        <Section title="매칭 기본 설정" icon={Shield} collapsible defaultOpen={false}>
           <div className="space-y-4">
             {[
               { key: 'trimWhitespace',  label: '앞뒤 공백 무시',  desc: '키 값 비교 시 앞뒤 공백을 자동으로 제거합니다' },
@@ -360,8 +293,73 @@ export function SettingsPage() {
           </div>
         </Section>
 
+        {/* 내보내기 파일명 설정 */}
+        <Section title="내보내기 파일명 설정" icon={FileText} collapsible defaultOpen={false}>
+          {(() => {
+            const now = new Date()
+            const pad = (n: number) => String(n).padStart(2, '0')
+            const y = now.getFullYear()
+            const mo = pad(now.getMonth() + 1)
+            const d = pad(now.getDate())
+            const h = pad(now.getHours())
+            const mi = pad(now.getMinutes())
+            const s = pad(now.getSeconds())
+            const suffix =
+              fileNameDateFormat === 'YYYYMMDD'       ? `${y}${mo}${d}` :
+              fileNameDateFormat === 'YYYY-MM-DD'     ? `${y}-${mo}-${d}` :
+              `${y}${mo}${d}_${h}${mi}${s}`
+            const preview = fileNameDateEnabled ? `거래처명_${suffix}.xlsx` : '거래처명.xlsx'
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-300 dark:text-slate-300 text-gray-700">파일명에 날짜/시간 자동 추가</p>
+                    <p className="text-xs text-slate-500 mt-0.5">다운로드 엑셀 파일명에 날짜를 붙여 B2B 사이트 업로드 시 중복 방지</p>
+                  </div>
+                  <button
+                    onClick={() => setFileNameDateEnabled(!fileNameDateEnabled)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${fileNameDateEnabled ? 'bg-primary-500' : 'bg-dark-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${fileNameDateEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                {fileNameDateEnabled && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-400">날짜 포맷</p>
+                    <div className="space-y-1.5">
+                      {([
+                        { value: 'YYYYMMDD_HHmmss', label: 'YYYYMMDD_HHmmss', desc: '날짜 + 시간 (권장)' },
+                        { value: 'YYYYMMDD',        label: 'YYYYMMDD',        desc: '날짜만' },
+                        { value: 'YYYY-MM-DD',      label: 'YYYY-MM-DD',      desc: '날짜만 (구분자 포함)' },
+                      ] as { value: FileNameDateFormat; label: string; desc: string }[]).map(opt => (
+                        <button key={opt.value} onClick={() => setFileNameDateFormat(opt.value)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                            fileNameDateFormat === opt.value
+                              ? 'bg-primary-500/10 border-primary-500/40 text-primary-300'
+                              : 'bg-dark-hover border-dark-border text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${fileNameDateFormat === opt.value ? 'border-primary-400 bg-primary-400' : 'border-slate-600'}`} />
+                          <div>
+                            <span className="text-xs font-mono font-semibold">{opt.label}</span>
+                            <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="px-3 py-2.5 rounded-xl bg-dark-hover border border-dark-border">
+                  <p className="text-xs text-slate-500 mb-1">파일명 미리보기</p>
+                  <p className="text-sm font-mono text-primary-300">{preview}</p>
+                </div>
+              </div>
+            )
+          })()}
+        </Section>
+
         {/* 저장 데이터 관리 */}
-        <Section title="저장 데이터 관리" icon={Trash2}>
+        <Section title="저장 데이터 관리" icon={Trash2} collapsible defaultOpen={false}>
           <div className="space-y-4">
             {/* 저장된 주문 */}
             <div className="flex items-center justify-between py-2 border-b border-dark-border">
@@ -402,7 +400,7 @@ export function SettingsPage() {
         </Section>
 
         {/* 데이터 복원 */}
-        <Section title="데이터 복원" icon={RotateCcw}>
+        <Section title="데이터 복원" icon={RotateCcw} collapsible defaultOpen={false}>
           <div className="space-y-3">
             <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500">
               컬럼 매핑 프리셋이 사라졌을 때 백업 파일에서 복원합니다.
