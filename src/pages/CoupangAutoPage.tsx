@@ -15,6 +15,7 @@ import { useSettingsStore, type MarketType } from '../stores/settingsStore'
 import { api, coupangApi, naverApi } from '../api/client'
 import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
 import { fillB2bFromOrder } from '../utils/fillMapper'
+import { buildExportFileName, downloadFilledB2b } from '../utils/excelWriter'
 
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
@@ -139,6 +140,7 @@ export function CoupangAutoPage() {
   const {
     multiMatchConfigs,
     coupangPartners, saveOrder, savedOrders,
+    fileNameDateEnabled, fileNameDateFormat,
   } = useSettingsStore()
 
   const [activeTab, setActiveTab] = useState<Tab>('match')
@@ -151,8 +153,8 @@ export function CoupangAutoPage() {
   const [step,           setStep]           = useState<Step>(1)
   const [selectedBizId,  setSelectedBizId]  = useState<string>('')
   const [selectedConnId, setSelectedConnId] = useState<string>('')
-  const [orderStatus,    setOrderStatus]    = useState<string>('ACCEPT')
-  const [startDate,      setStartDate]      = useState<string>(() => { const d = new Date(); d.setDate(d.getDate() - 4); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
+  const [orderStatus,    setOrderStatus]    = useState<string>('ALL')
+  const [startDate,      setStartDate]      = useState<string>(() => { const d = new Date(); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [endDate,        setEndDate]        = useState<string>(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [isFetching,     setIsFetching]     = useState(false)
   const [fetchProgress,  setFetchProgress]  = useState(0)
@@ -228,38 +230,41 @@ export function CoupangAutoPage() {
       if (orders.length > 0) {
         saveOrder('coupang-api', Object.keys(orders[0]), orders as Record<string, unknown>[])
       }
+
+      // 쿠팡: 신규주문 자동 발주확인처리 → 상품준비중
+      if (selectedMarket === '쿠팡') {
+        const shipmentBoxIds = [...new Set(
+          orders
+            .filter(o => o['주문상태'] === '신규주문')
+            .map(o => String(o['출고번호'] ?? ''))
+            .filter(Boolean)
+        )]
+        if (shipmentBoxIds.length > 0) {
+          setIsAcknowledging(true)
+          setAckResult(null)
+          try {
+            await api.post(
+              `/businesses/${selectedBizId}/connections/${selectedConnId}/coupang/acknowledge`,
+              { shipmentBoxIds }
+            )
+            const updated = orders.map(o =>
+              o['주문상태'] === '신규주문' ? { ...o, '주문상태': '상품준비중' } : o
+            )
+            setFetchedOrders(updated)
+            setAckResult(`✅ 신규주문 ${shipmentBoxIds.length}건 자동 발주확인 완료 — 상품준비중으로 변경됨`)
+          } catch (err: any) {
+            setAckResult(`⚠️ 자동 발주확인 실패: ${err.response?.data?.message ?? err.message}`)
+          } finally {
+            setIsAcknowledging(false)
+          }
+        }
+      }
     } catch (err: any) {
       clearInterval(progressInterval)
       setFetchProgress(0)
       setFetchError(err.message || '주문 조회 중 오류가 발생했습니다.')
     } finally {
       setIsFetching(false)
-    }
-  }
-
-  // ── 발주확인처리 (신규주문 → 상품준비중) ──────────────────────────────────
-  const handleAcknowledge = async () => {
-    if (!fetchedOrders || !selectedBizId || !selectedConnId) return
-    const acceptOrders = fetchedOrders.filter(o => o['주문상태'] === '신규주문')
-    if (acceptOrders.length === 0) { setAckResult('발주확인할 신규주문이 없습니다.'); return }
-
-    setIsAcknowledging(true)
-    setAckResult(null)
-    try {
-      const body = acceptOrders.map(o => ({
-        orderId:     String(o['주문번호']),
-        orderItemId: String(o['주문상품번호']),
-        vendorItemId: String(o['업체상품코드']),
-      }))
-      await api.post(
-        `/businesses/${selectedBizId}/connections/${selectedConnId}/coupang/acknowledge`,
-        body
-      )
-      setAckResult(`✅ ${acceptOrders.length}건 발주확인 완료! 주문 상태가 상품준비중으로 변경됩니다.`)
-    } catch (err: any) {
-      setAckResult(`❌ ${err.response?.data?.message ?? err.message}`)
-    } finally {
-      setIsAcknowledging(false)
     }
   }
 
@@ -270,7 +275,7 @@ export function CoupangAutoPage() {
 
     if (!fetchedOrders) { setIsMatching(false); return }
 
-    const matchableOrders = fetchedOrders  // 모든 상태 매칭
+    const matchableOrders = fetchedOrders.filter(o => o['주문상태'] === '상품준비중')
     const result: Record<string, any[]> = {}
 
     for (const order of matchableOrders) {
@@ -303,29 +308,21 @@ export function CoupangAutoPage() {
     const mapping    = marketMapping?.mapping    ?? partner.mapping
     const appendVals = marketMapping?.appendValues ?? partner.appendValues
     const { rows }   = fillB2bFromOrder(orders, partner.b2bHeaders, mapping, appendVals)
-    const ws = XLSX.utils.json_to_sheet(rows, { header: partner.b2bHeaders })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'B2B주문')
-    XLSX.writeFile(wb, `${partnerName}_B2B_${startDate}_${endDate}.xlsx`)
+    const baseName   = (partner.b2bFileName ?? partnerName).replace(/\.xlsx?$/i, '')
+    const fileName   = buildExportFileName(baseName, fileNameDateEnabled, fileNameDateFormat)
+    downloadFilledB2b(rows, fileName)
   }
 
   const downloadAllB2b = () => {
-    const wb = XLSX.utils.book_new()
-    Object.entries(matchResult).forEach(([name, orders]) => {
-      if (name === '(미매칭)') return
+    const targets = Object.entries(matchResult).filter(([name, orders]) => {
+      if (name === '(미매칭)') return false
       const partner = coupangPartners.find(p => p.partnerName === name)
-      if (!partner || !partner.b2bHeaders.length) return
-      const marketMapping = selectedMarket
-        ? partner.marketMappings?.find(m => m.marketType === selectedMarket)
-        : undefined
-      const mapping    = marketMapping?.mapping    ?? partner.mapping
-      const appendVals = marketMapping?.appendValues ?? partner.appendValues
-      const { rows }   = fillB2bFromOrder(orders, partner.b2bHeaders, mapping, appendVals)
-      const ws = XLSX.utils.json_to_sheet(rows, { header: partner.b2bHeaders })
-      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31))
+      return partner && partner.b2bHeaders.length > 0 && orders.length > 0
     })
-    if (wb.SheetNames.length === 0) { alert('다운로드할 B2B 파일이 없습니다.'); return }
-    XLSX.writeFile(wb, `전체B2B_${startDate}_${endDate}.xlsx`)
+    if (targets.length === 0) { alert('다운로드할 B2B 파일이 없습니다.'); return }
+    targets.forEach(([name, orders], i) => {
+      setTimeout(() => downloadB2bForPartner(name, orders), i * 300)
+    })
   }
 
   const partnerSummary = fetchedOrders
@@ -553,38 +550,28 @@ export function CoupangAutoPage() {
                     <p className="text-xs text-slate-600"><span className="text-slate-400">상태 선택</span> 후 아래 <span className="text-slate-400">주문 가져오기</span> 버튼을 눌러주세요.</p>
                   </div>
 
-                  {fetchedOrders !== null && (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
-                      <CheckCircle2 size={14} />
-                      주문 <span className="font-bold">{fetchedOrders.length}건</span> 가져왔습니다
-                    </div>
-                  )}
+                  {fetchedOrders !== null && (() => {
+                    const activeCount = fetchedOrders.filter(o =>
+                      o['주문상태'] === '신규주문' || o['주문상태'] === '상품준비중'
+                    ).length
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
+                        <CheckCircle2 size={14} />
+                        주문 <span className="font-bold">{activeCount}건</span> 가져왔습니다                      </div>
+                    )
+                  })()}
                 </div>
 
                 <p className="text-xs text-center text-slate-400 bg-dark-hover border border-dark-border rounded-xl px-4 py-2.5">
                   💡 거래처관리에서 B2B 주문양식 컬럼 매핑을 완성해야 적용됩니다.
                 </p>
 
-                {/* 발주확인처리 (신규주문 있을 때) */}
-                {fetchedOrders !== null && fetchedOrders.some(o => o['주문상태'] === '신규주문') && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2.5">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle size={14} className="text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-amber-300">신규주문 {fetchedOrders.filter(o => o['주문상태'] === '신규주문').length}건 — 발주확인 필요</p>
-                        <p className="text-xs text-amber-400/70 mt-0.5">쿠팡 셀러에서 '발주확인처리'를 해야 상품준비중으로 변경됩니다.<br />아래 버튼으로 API를 통해 자동 처리할 수 있습니다.</p>
-                      </div>
-                    </div>
-                    {ackResult && (
-                      <p className="text-xs px-2 py-1.5 rounded-lg bg-dark-hover text-slate-300">{ackResult}</p>
-                    )}
-                    <button
-                      onClick={handleAcknowledge}
-                      disabled={isAcknowledging}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50 transition-all"
-                    >
-                      {isAcknowledging ? <><Loader2 size={13} className="animate-spin" /> 처리 중...</> : '발주확인처리 (API 자동)'}
-                    </button>
+                {/* 자동 발주확인처리 결과 표시 */}
+                {(isAcknowledging || ackResult) && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-dark-hover border border-dark-border text-xs text-slate-300">
+                    {isAcknowledging
+                      ? <><Loader2 size={13} className="animate-spin text-amber-400" /> 신규주문 자동 발주확인처리 중...</>
+                      : <span>{ackResult}</span>}
                   </div>
                 )}
 
@@ -620,17 +607,19 @@ export function CoupangAutoPage() {
                 )}
 
                 {/* 수집 완료 표시 */}
-                {!isFetching && fetchProgress === 100 && fetchedOrders !== null && (
-                  fetchedOrders.length > 0 ? (
+                {!isFetching && fetchProgress === 100 && fetchedOrders !== null && (() => {
+                  const activeCount = fetchedOrders.filter(o =>
+                    o['주문상태'] === '신규주문' || o['주문상태'] === '상품준비중'
+                  ).length
+                  return activeCount > 0 ? (
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
-                      <CheckCircle2 size={14} /> 수집 완료 — <span className="font-bold">{fetchedOrders.length}건</span> 주문이 수집되었습니다
-                    </div>
+                      <CheckCircle2 size={14} /> 수집 완료 — <span className="font-bold">{activeCount}건</span> 주문이 수집되었습니다                    </div>
                   ) : (
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-500/10 border border-slate-500/20 text-sm text-slate-400">
                       <AlertCircle size={14} /> 해당 기간에 주문이 없습니다
                     </div>
                   )
-                )}
+                })()}
 
                 <button disabled={fetchedOrders === null || coupangPartners.length === 0 || isMatching}
                   onClick={handleMatch}
@@ -834,7 +823,7 @@ export function CoupangAutoPage() {
                 <button
                   onClick={downloadAllB2b}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-lg shadow-emerald-500/20">
-                  <Download size={15} /> 전체 B2B 한번에 다운로드 (시트별)
+                  <Download size={15} /> 전체 B2B 한번에 다운로드 (거래처별 파일)
                 </button>
 
                 <button onClick={() => { setStep(1); setMatchResult({}) }}

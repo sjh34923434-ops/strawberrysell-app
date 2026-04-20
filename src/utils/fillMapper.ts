@@ -25,6 +25,60 @@ export interface FillResult {
  *   - 주문 컬럼이 없고 appendValue만 있는 경우: output = appendValue (고정값으로 동작)
  *   - 둘 다 없으면: output = ''
  */
+// 공백/괄호/특수문자/대소문자 무시한 정규화 (autoMatchColumns와 동일 규칙)
+function normalizeKey(s: string): string {
+  return s
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[_\-·]/g, '')
+    .toLowerCase()
+}
+
+// 같은 의미의 컬럼명 동의어 그룹 (어느 쪽으로 매핑돼 있어도 서로 찾아냄)
+const SYNONYM_GROUPS: string[][] = [
+  ['수취인명', '수취인', '수취인이름', '수령인', '수령인명', '수령인이름', '받는사람', '받는분', '받는이'],
+  ['수취인연락처', '수취인전화', '수취인전화번호', '수령인전화', '수령인연락처', '받는사람전화', '받는사람연락처', '전화번호', '연락처', '휴대폰', '휴대폰번호'],
+  ['주소', '배송주소', '수취인주소', '수령인주소', '받는사람주소', '배송지', '배송지주소'],
+  ['우편번호', '우편', '우편코드', '배송우편번호'],
+  ['옵션명', '옵션', '옵션정보', '옵션내용', '등록옵션명', '옵션상세'],
+  ['상품명', '상품이름'],
+  ['주문자', '주문자명', '주문자이름'],
+  ['주문자연락처', '주문자전화', '주문자전화번호'],
+  ['배송메시지', '배송메세지'],
+  ['수량', '구매수'],
+]
+
+// 정규화된 이름 → 같은 그룹의 모든 변형들
+const SYNONYM_MAP: Record<string, string[]> = (() => {
+  const m: Record<string, string[]> = {}
+  for (const group of SYNONYM_GROUPS) {
+    const normalized = group.map(normalizeKey)
+    for (const n of normalized) m[n] = normalized
+  }
+  return m
+})()
+
+// orderRow에서 키를 찾되, 정확 매치 실패 시 정규화/동의어 기반으로 탐색
+function lookupOrderValue(orderRow: ExcelRow, orderCol: string): unknown {
+  if (orderCol in orderRow) return orderRow[orderCol]
+  const target = normalizeKey(orderCol)
+  if (!target) return undefined
+
+  // 1) 정규화 매치
+  for (const key of Object.keys(orderRow)) {
+    if (normalizeKey(key) === target) return orderRow[key]
+  }
+
+  // 2) 동의어 그룹 매치
+  const aliases = SYNONYM_MAP[target]
+  if (aliases) {
+    for (const key of Object.keys(orderRow)) {
+      if (aliases.includes(normalizeKey(key))) return orderRow[key]
+    }
+  }
+  return undefined
+}
+
 export function fillB2bFromOrder(
   orderRows: ExcelRow[],
   b2bHeaders: string[],
@@ -44,7 +98,7 @@ export function fillB2bFromOrder(
       // 행 번호 자동: 1부터 시작
       const orderVal  = orderCol === ROW_NUMBER_KEY
         ? String(rowIndex + 1)
-        : orderCol != null ? String(orderRow[orderCol] ?? '') : ''
+        : orderCol != null ? String(lookupOrderValue(orderRow, orderCol) ?? '') : ''
       // 분리배송 컬럼: 키가 없으면 기본 'N', 키가 존재하면 그 값 사용 (''이면 비워두기)
       const appendVal       = appendValues[b2bCol] ?? ''
       const hasExplicitKey  = b2bCol in appendValues

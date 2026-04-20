@@ -212,7 +212,7 @@ export function B2bPartnersPage() {
       marketFileData: coupangMM?.marketFileData ?? p.marketFileData ?? '',
       mapping: coupangMM?.mapping ?? p.mapping,
       appendValues: coupangMM?.appendValues ?? p.appendValues,
-      loadedPresetId: null })
+      loadedPresetId: p.id })
     setFormOpen(true)
   }
 
@@ -221,7 +221,7 @@ export function B2bPartnersPage() {
     setForm({ name: t.marketName, prefix: '', b2bFile: null,
       headers: t.headers, fileData: t.fileData ?? '',
       marketFile: null, marketHeaders: t.marketHeaders ?? [], marketFileData: t.marketFileData ?? '',
-      mapping: t.mapping, appendValues: t.appendValues, loadedPresetId: null })
+      mapping: t.mapping, appendValues: t.appendValues, loadedPresetId: t.id })
     setFormOpen(true)
   }
 
@@ -268,7 +268,7 @@ export function B2bPartnersPage() {
       marketFileData: mm?.marketFileData ?? '',
       mapping: mm?.mapping ?? {},
       appendValues: mm?.appendValues ?? {},
-      loadedPresetId: null,
+      loadedPresetId: editingId,
     }))
   }
 

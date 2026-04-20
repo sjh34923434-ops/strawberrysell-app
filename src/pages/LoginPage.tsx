@@ -1,36 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 
-const DEV_EMAIL    = (import.meta as any).env.VITE_DEV_EMAIL    as string | undefined
-const DEV_PASSWORD = (import.meta as any).env.VITE_DEV_PASSWORD as string | undefined
-
-// 컴포넌트 재마운트 시에도 한 번만 실행되도록 모듈 레벨에 선언
-let _devAutoLoginDone = false
+const STORAGE_EMAIL    = 'login_saved_email'
+const STORAGE_PASSWORD = 'login_saved_password'
 
 export function LoginPage() {
   const navigate            = useNavigate()
   const { login, isLoading, error, clearError } = useAuthStore()
 
-  const [email,      setEmail]      = useState(DEV_EMAIL    ?? '')
-  const [password,   setPassword]   = useState(DEV_PASSWORD ?? '')
-  const [showPw,     setShowPw]     = useState(false)
-  const [autoLogin,  setAutoLogin]  = useState(true)
-
-  // 개발 모드에서 자동 로그인 (앱 실행 중 딱 1회만)
-  useEffect(() => {
-    if (import.meta.env.DEV && DEV_EMAIL && DEV_PASSWORD && !_devAutoLoginDone) {
-      _devAutoLoginDone = true
-      login(DEV_EMAIL, DEV_PASSWORD).then(() => navigate('/dashboard')).catch(() => {})
-    }
-  }, [])
+  const [email,    setEmail]    = useState(() => localStorage.getItem(STORAGE_EMAIL)    ?? '')
+  const [password, setPassword] = useState(() => localStorage.getItem(STORAGE_PASSWORD) ?? '')
+  const [showPw,   setShowPw]   = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearError()
     try {
       await login(email, password)
+      localStorage.setItem(STORAGE_EMAIL,    email)
+      localStorage.setItem(STORAGE_PASSWORD, password)
       navigate('/dashboard')
     } catch {
       // 오류는 store의 error 필드에 표시
@@ -132,28 +122,6 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
-
-            {/* 자동 로그인 */}
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <div
-                onClick={() => setAutoLogin((v) => !v)}
-                className={`
-                  w-4 h-4 rounded flex items-center justify-center
-                  border transition-all duration-150 cursor-pointer
-                  ${autoLogin
-                    ? 'bg-primary-500 border-primary-500'
-                    : 'border-dark-border dark:border-dark-border border-gray-300 bg-transparent'
-                  }
-                `}
-              >
-                {autoLogin && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-xs text-slate-400 dark:text-slate-400 text-gray-500">자동 로그인</span>
-            </label>
 
             {/* 제출 */}
             <button
