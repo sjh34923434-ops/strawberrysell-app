@@ -8,6 +8,18 @@ export interface ParsedExcel {
   headers: string[];
   rows: ExcelRow[];
   sheetName: string;
+  /** 파일 파싱은 성공했으나 결과가 의심스러운 경우의 안내 메시지(.xls 깨짐 등) */
+  warning?: string;
+}
+
+/** 깨진 문자(��, 알 수 없는 기호) 또는 mojibake 감지 */
+function looksGarbled(s: string): boolean {
+  if (!s) return false
+  // 유니코드 대체 문자, 사적영역 문자, 박스/제어문자
+  if (/[\uFFFD\uE000-\uF8FF]/.test(s)) return true
+  // 한글 깨짐 mojibake 패턴 (CP949 → UTF-8 잘못 해석 시 자주 나오는 글자)
+  if (/[ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ]{2,}/.test(s)) return true
+  return false
 }
 
 /**
@@ -340,7 +352,20 @@ export async function readExcelFile(
     return normalizeScientific(obj)
   });
 
-  return { headers, rows: rawRows, sheetName };
+  // .xls 파일에 한해 결과가 의심스러우면 경고 생성 (정상 파일에는 부담 안 줌)
+  let warning: string | undefined
+  if (ext === 'xls') {
+    const garbledHeader = headers.some(looksGarbled)
+    const tooFewRows    = rawRows.length === 0
+    const oneRowOnly    = rawRows.length === 1 && headers.length >= 5
+    if (garbledHeader || tooFewRows || oneRowOnly) {
+      warning =
+        '이 파일은 구형 .xls 형식이라 컬럼이 깨져 보이거나 일부 데이터가 누락될 수 있어요.\n' +
+        '엑셀에서 파일을 열고 [다른 이름으로 저장] → "Excel 통합 문서(*.xlsx)" 형식으로 저장 후 다시 업로드해주세요.'
+    }
+  }
+
+  return { headers, rows: rawRows, sheetName, warning };
 }
 
 /**

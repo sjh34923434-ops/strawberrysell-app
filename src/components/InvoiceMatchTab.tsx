@@ -138,6 +138,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
   const [isDragging,    setIsDragging]    = useState(false)
   const [isProcessing,  setIsProcessing]  = useState(false)
   const [error,         setError]         = useState<string | null>(null)
+  const [warnings,      setWarnings]      = useState<Array<{ fileName: string; message: string }>>([])
   const [autoRunCount,  setAutoRunCount]  = useState<number | null>(null)  // 카운트다운 (초)
   const [saveModal,     setSaveModal]     = useState<{ entryId: string; name: string } | null>(null)
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null)
@@ -289,12 +290,13 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
   }
 
   const addFiles = useCallback(async (files: File[]) => {
-    setError(null); setResult(null)
+    setError(null); setResult(null); setWarnings([])
     const order = savedOrders.find(o => o.id === savedOrderId)
     for (const file of files) {
       try {
         const data = await readExcelFile(file)
         const rows = data.rows as Record<string, unknown>[]
+        if (data.warning) setWarnings(prev => [...prev, { fileName: file.name, message: data.warning! }])
 
         // 프리셋 자동 매칭
         const preset = findSupplierMappingPreset(data.headers, marketType)
@@ -346,7 +348,12 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
     e.target.value = ''
   }
 
-  const removeEntry = (id: string) => { setEntries(prev => prev.filter(e => e.id !== id)); setResult(null) }
+  const removeEntry = (id: string) => {
+    const removed = entries.find(e => e.id === id)
+    setEntries(prev => prev.filter(e => e.id !== id))
+    setResult(null)
+    if (removed) setWarnings(prev => prev.filter(w => w.fileName !== removed.file.name))
+  }
   const toggleExpanded = (id: string) => setEntries(prev => prev.map(e => e.id === id ? { ...e, expanded: !e.expanded } : e))
   const updateEntry = (id: string, patch: Partial<SupplierEntry>) => {
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
@@ -616,6 +623,27 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
         <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
           <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
           <p className="text-sm text-red-300 whitespace-pre-line">{error}</p>
+        </div>
+      )}
+
+      {/* 파일 형식 경고 (.xls 깨짐 등) */}
+      {warnings.length > 0 && (
+        <div className="space-y-2">
+          {warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 text-sm text-amber-200 whitespace-pre-line">
+                <p className="font-semibold mb-1">⚠️ {w.fileName}</p>
+                {w.message}
+              </div>
+              <button
+                onClick={() => setWarnings(prev => prev.filter((_, idx) => idx !== i))}
+                className="text-amber-400/60 hover:text-amber-300 text-xs px-2 py-0.5 rounded transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
