@@ -229,7 +229,7 @@ export function MultiMatchPage() {
       // 업체상품코드가 있으면 자동 선택
       const autoCol = parsed.headers.find(h => /업체상품코드/i.test(h))
       if (autoCol) setClassifyColumn(autoCol)
-      saveOrder('multi-match', parsed.headers, parsed.rows as Record<string, unknown>[])
+      saveOrder('multi-match', parsed.headers, parsed.rows as Record<string, unknown>[], file.name)
     } catch (err) {
       setError(err instanceof Error ? err.message : '주문 파일을 읽는 중 오류가 발생했습니다.')
       setOrderFile(null)

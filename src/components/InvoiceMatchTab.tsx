@@ -10,6 +10,7 @@ import { Send } from 'lucide-react'
 import { DownloadButton } from './DownloadButton'
 import { downloadFilledB2b } from '../utils/excelWriter'
 import { readExcelFile, type ParsedExcel } from '../utils/excelReader'
+import { fillB2bFromOrder, autoMatchColumns, ROW_NUMBER_KEY, type ColumnMapping } from '../utils/fillMapper'
 
 const COUPANG_CARRIER_MAP: Record<string, string> = {
   'CJ대한통운': 'CJGLS',
@@ -40,9 +41,25 @@ const SOURCE_LABEL: Record<SavedOrderSource, string> = {
   'multi-match':  '일괄매칭',
 }
 
+// 다운로드 파일명용 마켓별 영문 코드
+const MARKET_EN: Record<string, string> = {
+  '쿠팡':       'Coupang',
+  '스마트스토어': 'Smartstore',
+  '11번가':     '11st',
+  'G마켓':      'Gmarket',
+  '옥션':       'Auction',
+  '인터파크':   'Interpark',
+  '티몬':       'Tmon',
+  '위메프':     'Wemakeprice',
+  '카카오쇼핑': 'Kakao',
+  '쿠팡이츠':   'CoupangEats',
+}
+const marketToEn = (name: string) => MARKET_EN[name] ?? name.replace(/[^\w]/g, '_')
+
 const KEY_DETECT_PATTERNS = [
   /수취인이름|수취인명|수령인명|수령인이름|받는분이름|받는분명|^수령인$/,
   /수취인전화|수취인.*번호|수령인전화|수령인.*핸드폰|수령인.*폰|수령인.*번호|수령인.*연락처|받는분.*전화|받는분.*번호/,
+  /^업체상품코드$|vendorItemId/i,
 ]
 
 const normalizeKeyVal = (raw: unknown): string => {
@@ -111,6 +128,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
     updateSupplierMappingPreset,
     touchSupplierMappingPreset,
     findSupplierMappingPreset,
+    marketTemplates,
   } = useSettingsStore()
 
   const filtered = savedOrders.filter(o => o.source === source)
@@ -159,9 +177,11 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
 
   const handleSendToCoupang = async () => {
     if (!result || !sendBizId || !sendConnId) return
-    const shipmentCol = result.headers.find(h => /묶음배송번호|shipmentBoxId/i.test(h))
+    const shipmentCol = result.headers.find(h => /묶음배송번호|출고번호|shipmentBoxId/i.test(h))
     const carrierCol  = result.headers.find(h => /^택배사$/.test(h))
     const invoiceCol  = result.headers.find(h => /^운송장번호$/.test(h))
+    const orderIdCol  = result.headers.find(h => /^주문번호$|^orderId$/i.test(h)) ?? null
+    const vendorItemCol = result.headers.find(h => /^업체상품코드$|vendorItemId/i.test(h)) ?? null
     if (!shipmentCol || !carrierCol || !invoiceCol) {
       setSendResult({ ok: 0, fail: 0, message: '묶음배송번호/택배사/운송장번호 컬럼을 찾을 수 없습니다.' })
       return
@@ -171,8 +191,12 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
       .map(r => {
         const carrierRaw = String(r[carrierCol] ?? '').trim()
         const code = COUPANG_CARRIER_MAP[carrierRaw] ?? COUPANG_CARRIER_MAP[carrierRaw.replace(/택배$/, '')] ?? carrierRaw
+        const orderId      = orderIdCol    ? String(r[orderIdCol] ?? '').trim()    : ''
+        const vendorItemId = vendorItemCol ? String(r[vendorItemCol] ?? '').trim() : ''
         return {
           shipmentBoxId:        String(r[shipmentCol]),
+          ...(orderId      ? { orderId }      : {}),
+          ...(vendorItemId ? { vendorItemId } : {}),
           deliveryCompanyCode:  code,
           invoiceNumber:        String(r[invoiceCol]),
         }
@@ -324,7 +348,12 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
 
   const removeEntry = (id: string) => { setEntries(prev => prev.filter(e => e.id !== id)); setResult(null) }
   const toggleExpanded = (id: string) => setEntries(prev => prev.map(e => e.id === id ? { ...e, expanded: !e.expanded } : e))
-  const updateEntry = (id: string, patch: Partial<SupplierEntry>) => setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
+  const updateEntry = (id: string, patch: Partial<SupplierEntry>) => {
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
+    const keys = Object.keys(patch)
+    const onlyMeta = keys.length > 0 && keys.every(k => k === 'presetId' || k === 'presetName' || k === 'expanded')
+    if (!onlyMeta) setResult(null)
+  }
 
   const addKeyPair = (id: string) => {
     const entry = entries.find(e => e.id === id)
@@ -375,8 +404,17 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
       const VENDOR_CODE_RE = /업체상품코드/
       const orderVendorCol = savedOrder.headers.find(h => VENDOR_CODE_RE.test(h)) ?? null
 
+      const shipmentBoxCol = savedOrder.headers.find(h => /묶음배송번호|출고번호|shipmentBoxId/i.test(h)) ?? null
+
       const indexes = entries.map(entry => {
-        const bilateral = entry.keyPairs.filter(p => p.supplierCol)
+        const userBilateral = entry.keyPairs.filter(p => p.supplierCol)
+        // 양쪽 파일에 업체상품코드가 있는데 사용자 키에 빠져 있으면 자동으로 bilateral에 추가
+        // (다른 상품인데 수령인만 같은 주문이 잘못 매칭되는 것을 방지)
+        const supplierVendorCol = entry.data.headers.find(h => VENDOR_CODE_RE.test(h)) ?? null
+        const bilateral: KeyPair[] = [...userBilateral]
+        if (orderVendorCol && supplierVendorCol && !userBilateral.some(p => VENDOR_CODE_RE.test(p.orderCol))) {
+          bilateral.push({ orderCol: orderVendorCol, supplierCol: supplierVendorCol })
+        }
         const multiIdx = new Map<string, Record<string, unknown>[]>()
         for (const row of entry.data.rows) {
           const key = makeCompositeKey(row as Record<string, unknown>, bilateral.map(p => p.supplierCol))
@@ -388,12 +426,13 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
         }
         const assignCache  = new Map<string, Record<string, unknown>>()
         const lastAssigned = new Map<string, Record<string, unknown>>()
+        // 폴백 시 묶음배송번호 일치 검증용: baseKey → 해당 baseKey로 직전 매칭된 주문의 묶음배송번호
+        const lastShipmentBox = new Map<string, string>()
         // 업체상품코드 검증용: 거래처 파일에 있는 업체상품코드 값 Set
-        const supplierVendorCol = entry.data.headers.find(h => VENDOR_CODE_RE.test(h)) ?? null
         const supplierVendorSet: Set<string> = supplierVendorCol
           ? new Set((entry.data.rows as Record<string, unknown>[]).map(r => normalizeKeyVal(r[supplierVendorCol])).filter(v => v !== ''))
           : new Set()
-        return { bilateral, unilateral: entry.keyPairs.filter(p => !p.supplierCol), multiIdx, assignCache, lastAssigned, supplierVendorSet }
+        return { bilateral, unilateral: entry.keyPairs.filter(p => !p.supplierCol), multiIdx, assignCache, lastAssigned, lastShipmentBox, supplierVendorSet }
       })
 
       const splitDeliveryCols = savedOrder.headers.filter(h => /분리배송.*[YyNn\/]|분리\s*배송\s*y/i.test(h))
@@ -415,8 +454,9 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
 
         // Phase 1: 각 B2B 파일에서 새(fresh) 행 시도
         for (let ei = 0; ei < entries.length && matchedRow === undefined; ei++) {
-          const { bilateral, unilateral, multiIdx, assignCache, lastAssigned } = indexes[ei]
+          const { bilateral, unilateral, multiIdx, assignCache, lastAssigned, lastShipmentBox } = indexes[ei]
           const baseKey = makeCompositeKey(orderRow, bilateral.map(p => p.orderCol))
+          const currShipBox = shipmentBoxCol ? String(orderRow[shipmentBoxCol] ?? '').trim() : ''
 
           if (unilateral.length > 0) {
             // 옵션ID 있음: fullKey 캐시로 같은 옵션ID → 같은 B2B 행, 다른 옵션ID → 다음 행
@@ -430,6 +470,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
                 matchedRow = list.shift()!
                 assignCache.set(fullKey, matchedRow)
                 lastAssigned.set(baseKey, matchedRow)
+                if (currShipBox) lastShipmentBox.set(baseKey, currShipBox)
                 matchedEi = ei
               }
             }
@@ -439,22 +480,30 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
             if (list && list.length > 0) {
               matchedRow = list.shift()!
               lastAssigned.set(baseKey, matchedRow)
+              if (currShipBox) lastShipmentBox.set(baseKey, currShipBox)
               matchedEi = ei
             }
           }
         }
 
         // Phase 2: 모든 파일에서 새 행 없음 → lastAssigned 폴백 (B2B 1행인데 주문 2행인 경우)
-        // 단, 거래처 파일에 업체상품코드가 있고 주문 행의 업체상품코드가 그 Set에 없으면 폴백 차단
+        // 단, (a) 거래처 파일에 업체상품코드가 있고 주문 행의 업체상품코드가 그 Set에 없으면 폴백 차단
+        //     (b) 묶음배송번호가 있고 직전 매칭 주문과 다르면 (= 다른 출고건) 폴백 차단
         if (matchedRow === undefined) {
           for (let ei = 0; ei < entries.length && matchedRow === undefined; ei++) {
-            const { bilateral, unilateral, lastAssigned, assignCache, supplierVendorSet } = indexes[ei]
+            const { bilateral, unilateral, lastAssigned, lastShipmentBox, assignCache, supplierVendorSet } = indexes[ei]
             // 업체상품코드 교차 검증
             if (supplierVendorSet.size > 0 && orderVendorCol) {
               const orderVendorVal = normalizeKeyVal(orderRow[orderVendorCol])
               if (orderVendorVal && !supplierVendorSet.has(orderVendorVal)) continue
             }
             const baseKey = makeCompositeKey(orderRow, bilateral.map(p => p.orderCol))
+            // 묶음배송번호 검증: 다른 shipmentBox면 다른 출고건 → 폴백 금지
+            if (shipmentBoxCol) {
+              const currShipBox = String(orderRow[shipmentBoxCol] ?? '').trim()
+              const lastShipBox = lastShipmentBox.get(baseKey)
+              if (currShipBox && lastShipBox && currShipBox !== lastShipBox) continue
+            }
             const fallback = lastAssigned.get(baseKey)
             if (fallback) {
               matchedRow = fallback
@@ -511,7 +560,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
     try {
       const data = await readExcelFile(file)
       const rows = data.rows as Record<string, unknown>[]
-      saveOrder(source, data.headers, rows)
+      saveOrder(source, data.headers, rows, file.name)
       // 방금 저장된 항목 자동 선택 (savedOrders는 최신순 정렬이므로 첫 번째)
       // saveOrder가 동기적으로 store를 업데이트하므로 setTimeout으로 렌더 후 선택
       setTimeout(() => {
@@ -566,7 +615,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
       {error && (
         <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
           <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-red-300">{error}</p>
+          <p className="text-sm text-red-300 whitespace-pre-line">{error}</p>
         </div>
       )}
 
@@ -642,7 +691,12 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
             </div>
           </>
         )}
-        {savedOrder && <p className="text-xs text-slate-500">{savedOrder.rows.length.toLocaleString()}행 · 컬럼 {savedOrder.headers.length}개</p>}
+        {savedOrder && (
+          <p className="text-xs text-slate-500">
+            {savedOrder.rows.length.toLocaleString()}행 · 컬럼 {savedOrder.headers.length}개
+            {savedOrder.fileName && <span className="ml-2 text-amber-400/80">📎 {savedOrder.fileName}</span>}
+          </p>
+        )}
       </div>
 
       {/* STEP 2: 거래처 파일들 */}
@@ -687,14 +741,20 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
             </div>
 
             {/* 접힌 요약 */}
-            {!entry.expanded && (
-              <div className="px-3.5 pb-2.5 flex gap-3 text-xs text-slate-600 flex-wrap">
-                <span>키: {entry.keyPairs.map(p => p.supplierCol || '?').join(', ')}</span>
-                <span>·</span>
-                <span className={!entry.invoiceCol ? 'text-red-400' : ''}>운송장: {entry.invoiceCol || '미설정'}</span>
-                {entry.carrierCol && <><span>·</span><span>택배사: {entry.carrierCol}</span></>}
-              </div>
-            )}
+            {!entry.expanded && (() => {
+              const autoVendor =
+                !!savedOrder?.headers.some(h => /업체상품코드/.test(h)) &&
+                !!entry.data.headers.some(h => /업체상품코드/.test(h)) &&
+                !entry.keyPairs.some(p => /업체상품코드/.test(p.orderCol))
+              return (
+                <div className="px-3.5 pb-2.5 flex gap-3 text-xs text-slate-600 flex-wrap">
+                  <span>키: {entry.keyPairs.map(p => p.supplierCol || '?').join(', ')}{autoVendor && <span className="text-emerald-400/70">, 업체상품코드(자동)</span>}</span>
+                  <span>·</span>
+                  <span className={!entry.invoiceCol ? 'text-red-400' : ''}>운송장: {entry.invoiceCol || '미설정'}</span>
+                  {entry.carrierCol && <><span>·</span><span>택배사: {entry.carrierCol}</span></>}
+                </div>
+              )
+            })()}
 
             {/* 펼친 설정 */}
             {entry.expanded && savedOrder && (
@@ -781,6 +841,7 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
                         const pairs  = first.keyPairs.map(p => ({ orderCol: p.orderCol, supplierCol: e.data.headers.includes(p.supplierCol) ? p.supplierCol : e.data.headers[0] ?? '' }))
                         return { ...e, keyPairs: pairs, invoiceCol: invCol, carrierCol: carCol, presetId: undefined, presetName: undefined }
                       }))
+                      setResult(null)
                     }} className="flex items-center gap-1.5 text-xs text-sky-400/70 hover:text-sky-300 transition-colors px-1">
                       <Plus size={11} /> 나머지에 적용
                     </button>
@@ -903,13 +964,18 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
           )}
 
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-300">총 <span className="text-amber-400">{result.rows.length.toLocaleString()}</span>행</p>
+            <p className="text-sm font-medium text-slate-300">
+              총 <span className="text-amber-400">{result.rows.length.toLocaleString()}</span>행
+              <span className="ml-2 text-xs text-slate-500">· 다운로드는 매칭 <span className="text-emerald-400">{result.matched.toLocaleString()}</span>건만 포함</span>
+            </p>
             {(() => {
               const splitCol = result.headers.find(h => /분리배송/.test(h))
+              // 매칭된 행(운송장번호 채워진 것)만 다운로드에 포함
+              const matchedOnly = result.rows.filter(r => String(r['운송장번호'] ?? '').trim() !== '')
               const dlRows = splitCol
-                ? result.rows.map(row => ({ ...row, [splitCol]: 'N' }))
-                : result.rows
-              return <DownloadButton rows={dlRows as any} fileName="송장매칭결과" label="매칭완료 엑셀다운" />
+                ? matchedOnly.map(row => ({ ...row, [splitCol]: 'N' }))
+                : matchedOnly
+              return <DownloadButton rows={dlRows as any} fileName="Invoice_Matched" label="매칭완료 엑셀다운" />
             })()}
           </div>
 
@@ -1024,75 +1090,104 @@ export function InvoiceMatchTab({ source, marketType }: InvoiceMatchTabProps) {
                   </div>
                 </div>
 
-                {/* 쿠팡 업로드용 7개 컬럼 */}
+                {/* 마켓 업로드용 — 거래처 관리 > 마켓 송장등록 양식에 저장된 템플릿 기반 */}
                 {(() => {
-                  const UPLOAD_COLS: Array<{ label: string; pat: RegExp }> = [
-                    { label: '번호',        pat: /^번호$/ },
-                    { label: '묶음배송번호', pat: /묶음배송번호/ },
-                    { label: '주문번호',    pat: /^주문번호$/ },
-                    { label: '택배사',      pat: /^택배사$/ },
-                    { label: '운송장번호',  pat: /^운송장번호$/ },
-                    { label: '분리배송',    pat: /분리배송/ },
-                    { label: '옵션ID',      pat: /^옵션\s*id$/i },
-                  ]
-                  const cols = UPLOAD_COLS.map(({ label, pat }) => ({
-                    label, src: result.headers.find(h => pat.test(h)) ?? '',
-                  }))
-                  // 모든 컬럼 헤더 유지, 7개만 데이터 채움 (분리배송 → 'N' 자동채움)
-                  const splitDeliveryCol = cols.find(c => c.label === '분리배송')?.src ?? ''
-                  const uploadRows = result.rows.map(row => {
-                    const out: Record<string, unknown> = {}
-                    for (const h of result.headers) out[h] = ''
-                    for (const c of cols) if (c.src) out[c.src] = row[c.src] ?? ''
-                    if (splitDeliveryCol) out[splitDeliveryCol] = 'N'
-                    return out
-                  })
+                  // marketType(props)에 해당하는 템플릿 우선, 없으면 쿠팡 기본
+                  const targetMarket = marketType ?? '쿠팡'
+                  const template =
+                    marketTemplates.find(t => t.marketName === targetMarket) ??
+                    marketTemplates.find(t => t.marketName === '쿠팡')
+
+                  if (!template || template.headers.length === 0) {
+                    return (
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-300">
+                        <span className="font-semibold">마켓 송장등록 양식이 없어요.</span>{' '}
+                        거래처 관리 &gt; 마켓 송장등록 양식에서 {targetMarket} 양식을 등록하면 여기에 자동으로 표시돼요.
+                      </div>
+                    )
+                  }
+
+                  // 1) 양식 헤더 ↔ 주문 헤더 자동 매칭 (SYNONYM 그룹 포함)
+                  const autoMapping: ColumnMapping = autoMatchColumns(result.headers, template.headers)
+                  // 2) 사용자가 거래처 관리에서 명시적으로 저장한 매핑으로 덮어쓰기
+                  const mapping: ColumnMapping = { ...autoMapping }
+                  for (const [col, src] of Object.entries(template.mapping)) {
+                    if (src) mapping[col] = src
+                  }
+                  // 2.5) 주문에 "동일 이름"의 컬럼이 있으면 무조건 그것 사용
+                  //      (예: 양식 '업체상품코드' ↔ 주문 '업체상품코드' — 저장된 매핑보다 우선)
+                  for (const h of template.headers) {
+                    if (result.headers.includes(h)) mapping[h] = h
+                  }
+                  // 3) '번호' 컬럼은 자동 행번호 (1부터) — 단, 주문에 '번호' 컬럼이 실제 있으면 그것 유지
+                  for (const h of template.headers) {
+                    if (/^번호$|^순번$|^No\.?$/i.test(h) && !result.headers.includes(h)) mapping[h] = ROW_NUMBER_KEY
+                  }
+                  const filled = fillB2bFromOrder(
+                    result.rows as Array<Record<string, string | number | boolean | null>>,
+                    template.headers,
+                    mapping,
+                    template.appendValues,
+                  )
+                  const invoiceKey = template.headers.find(h => /운송장|송장번호/.test(h))
+                  const carrierKey = template.headers.find(h => /택배사|배송사/.test(h))
+                  const mappedCount = filled.mappedCount
                   return (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 overflow-hidden">
                       <div className="px-3 py-2.5 border-b border-violet-500/20 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-violet-300">쿠팡 업로드용 (7개 컬럼)</span>
+                        <span className="text-xs font-semibold text-violet-300">
+                          {template.marketName} 업로드용 ({template.headers.length}개 컬럼
+                          <span className="text-slate-500 font-normal"> · 매핑 {mappedCount}개</span>)
+                          {invoiceKey && (() => {
+                            const matchedRows = filled.rows.filter(r => String(r[invoiceKey] ?? '').trim() !== '').length
+                            return <span className="ml-1 text-slate-500 font-normal"> · 다운로드 <span className="text-emerald-400">{matchedRows}</span>행</span>
+                          })()}
+                        </span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-600">최대 10행</span>
                           <button
                             onClick={() => {
                               import('xlsx').then(XLSX => {
-                                const orderedHeaders = result.headers
-                                const dataRows = uploadRows.map(row => orderedHeaders.map(h => row[h] ?? ''))
-                                const sheet = XLSX.utils.aoa_to_sheet([orderedHeaders, ...dataRows])
+                                // 매칭된 행(운송장번호 있는 것)만 다운로드
+                                const matchedFilled = invoiceKey
+                                  ? filled.rows.filter(r => String(r[invoiceKey] ?? '').trim() !== '')
+                                  : filled.rows
+                                const dataRows = matchedFilled.map(row => template.headers.map(h => row[h] ?? ''))
+                                const sheet = XLSX.utils.aoa_to_sheet([template.headers, ...dataRows])
                                 const wb = XLSX.utils.book_new()
                                 XLSX.utils.book_append_sheet(wb, sheet, 'Sheet1')
                                 const now = new Date()
                                 const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`
-                                XLSX.writeFile(wb, `Coupang_Up_${ts}.xlsx`)
+                                XLSX.writeFile(wb, `${marketToEn(template.marketName)}_Up_${ts}.xlsx`)
                               })
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
                           >
-                            <Download size={12} /> 쿠팡 업로드 엑셀 다운
+                            <Download size={12} /> {template.marketName} 업로드 엑셀 다운
                           </button>
                         </div>
                       </div>
                       <div className="overflow-x-auto max-h-48">
                         <table className="w-full text-xs border-collapse min-w-max">
                           <thead className="sticky top-0 bg-dark-surface">
-                            <tr>{cols.map(c => (
-                              <th key={c.label} className={`px-3 py-2 text-left border-b border-dark-border font-medium whitespace-nowrap
-                                ${c.label === '운송장번호' ? 'text-emerald-400/80' : c.label === '택배사' ? 'text-sky-400/80' : 'text-violet-400/70'}`}>
-                                {c.label}
+                            <tr>{template.headers.map(h => (
+                              <th key={h} className={`px-3 py-2 text-left border-b border-dark-border font-medium whitespace-nowrap
+                                ${h === invoiceKey ? 'text-emerald-400/80' : h === carrierKey ? 'text-sky-400/80' : 'text-violet-400/70'}`}>
+                                {h}
                               </th>
                             ))}</tr>
                           </thead>
                           <tbody>
-                            {uploadRows.slice(0, 10).map((row, i) => {
-                              const hasInvoice = !!(row['운송장번호'])
+                            {filled.rows.slice(0, 10).map((row, i) => {
+                              const hasInvoice = !!(invoiceKey && row[invoiceKey])
                               return (
                                 <tr key={i} className={`border-b border-dark-border/40 ${hasInvoice ? 'bg-emerald-500/5' : 'bg-red-500/5'}`}>
-                                  {cols.map(c => (
-                                    <td key={c.label} className={`px-3 py-2 whitespace-nowrap max-w-[180px] truncate
-                                      ${c.label === '운송장번호' && hasInvoice ? 'text-emerald-300 font-medium'
-                                        : c.label === '택배사' && hasInvoice ? 'text-sky-300'
+                                  {template.headers.map(h => (
+                                    <td key={h} className={`px-3 py-2 whitespace-nowrap max-w-[180px] truncate
+                                      ${h === invoiceKey && hasInvoice ? 'text-emerald-300 font-medium'
+                                        : h === carrierKey && hasInvoice ? 'text-sky-300'
                                         : 'text-slate-400'}`}>
-                                      {String(row[c.label] ?? '')}
+                                      {String(row[h] ?? '')}
                                     </td>
                                   ))}
                                 </tr>

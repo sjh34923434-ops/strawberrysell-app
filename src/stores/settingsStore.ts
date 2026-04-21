@@ -108,6 +108,7 @@ export interface SavedOrder {
   headers:  string[]
   rows:     Record<string, unknown>[]
   savedAt:  string
+  fileName?: string                       // 원본 업로드 파일명 (있으면 라벨에 노출)
 }
 
 interface SettingsState {
@@ -141,7 +142,7 @@ interface SettingsState {
   deleteMarketTemplate:   (id: string) => void
 
   savedOrders:            SavedOrder[]
-  saveOrder:              (source: SavedOrderSource, headers: string[], rows: Record<string, unknown>[]) => void
+  saveOrder:              (source: SavedOrderSource, headers: string[], rows: Record<string, unknown>[], fileName?: string) => void
   deleteSavedOrder:       (id: string) => void
 
   supplierMappingPresets:        SupplierMappingPreset[]
@@ -242,12 +243,13 @@ export const useSettingsStore = create<SettingsState>()(
       deleteMarketTemplate: (id) =>
         set({ marketTemplates: get().marketTemplates.filter(t => t.id !== id) }),
 
-      saveOrder: (source, headers, rows) => {
+      saveOrder: (source, headers, rows, fileName) => {
         const now   = new Date()
         const date  = now.toISOString().slice(0, 10)
         const time  = now.toTimeString().slice(0, 5)   // "HH:MM"
         const sourceLabel = source === 'coupang-api' ? '쿠팡API' : source === 'matching' ? '주문매칭' : '일괄매칭'
-        const label = `${date} ${time} ${sourceLabel} (${rows.length}건)`
+        const cleanName = fileName ? fileName.replace(/\.[^.]+$/, '') : ''
+        const label = `${date} ${time} ${sourceLabel} (${rows.length}건)${cleanName ? ` · ${cleanName}` : ''}`
         const order: SavedOrder = {
           id:      Date.now().toString(),
           label,
@@ -256,6 +258,7 @@ export const useSettingsStore = create<SettingsState>()(
           headers,
           rows,
           savedAt: now.toISOString(),
+          fileName,
         }
         const existing = get().savedOrders
         // 100개 초과 시 전체 초기화 후 새 항목만 저장

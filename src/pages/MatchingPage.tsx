@@ -228,7 +228,7 @@ export function MatchingPage() {
     try {
       const parsed = await readExcelFile(file)
       setOrderData(parsed)
-      saveOrder('matching', parsed.headers, parsed.rows as Record<string, unknown>[])
+      saveOrder('matching', parsed.headers, parsed.rows as Record<string, unknown>[], file.name)
       // 주문→B2B 모드일 때만 자동 매칭
       if (mode === 'order') await autoMatchAndFill(parsed)
     } catch (err) {

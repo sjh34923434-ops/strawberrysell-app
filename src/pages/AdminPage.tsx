@@ -28,10 +28,12 @@ interface Stats {
   totalLicenses:   number
   activeLicenses:  number
   expiredLicenses: number
+  trialUsers:      number
   monthlyUsers:    { month: string; users: string }[]
   monthlyLicenses: { month: string; licenses: string }[]
   monthlyActive:   { month: string; licenses: string }[]
   monthlyExpired:  { month: string; licenses: string }[]
+  monthlyTrial:    { month: string; licenses: string }[]
 }
 
 function BarChart({ data, color, label }: {
@@ -89,7 +91,7 @@ export function AdminPage() {
   const [error,     setError]     = useState<string | null>(null)
   const [betaMode,    setBetaMode]    = useState<boolean | null>(null)
   const [betaSaving,  setBetaSaving]  = useState(false)
-  const [activeChart, setActiveChart] = useState<'users' | 'licenses' | 'active' | 'expired'>('users')
+  const [activeChart, setActiveChart] = useState<'users' | 'licenses' | 'active' | 'expired' | 'trial'>('users')
 
   // 라이선스 발급 폼
   const [plan,  setPlan]  = useState('1month')
@@ -221,12 +223,13 @@ export function AdminPage() {
         <>
           <div>
             <p className="text-xs text-slate-500 mb-2">이번 달 현황 — 클릭하면 그래프로 확인</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
-                { key: 'users',    label: '신규 사용자',   value: stats.totalUsers,      color: 'text-blue-400',   ring: 'ring-blue-500/50',   bg: 'bg-blue-500/10' },
-                { key: 'licenses', label: '발급 라이선스', value: stats.totalLicenses,   color: 'text-purple-400', ring: 'ring-purple-500/50', bg: 'bg-purple-500/10' },
-                { key: 'active',   label: '활성 라이선스', value: stats.activeLicenses,  color: 'text-green-400',  ring: 'ring-green-500/50',  bg: 'bg-green-500/10' },
-                { key: 'expired',  label: '만료 라이선스', value: stats.expiredLicenses, color: 'text-red-400',    ring: 'ring-red-500/50',    bg: 'bg-red-500/10' },
+                { key: 'users',    label: '신규 사용자',     value: stats.totalUsers,      color: 'text-blue-400',    ring: 'ring-blue-500/50',    bg: 'bg-blue-500/10' },
+                { key: 'licenses', label: '발급 라이선스',   value: stats.totalLicenses,   color: 'text-purple-400',  ring: 'ring-purple-500/50',  bg: 'bg-purple-500/10' },
+                { key: 'active',   label: '활성 라이선스',   value: stats.activeLicenses,  color: 'text-green-400',   ring: 'ring-green-500/50',   bg: 'bg-green-500/10' },
+                { key: 'expired',  label: '만료 라이선스',   value: stats.expiredLicenses, color: 'text-red-400',     ring: 'ring-red-500/50',     bg: 'bg-red-500/10' },
+                { key: 'trial',    label: '7일 무료이용중',  value: stats.trialUsers,      color: 'text-amber-400',   ring: 'ring-amber-500/50',   bg: 'bg-amber-500/10' },
               ].map(({ key, label, value, color, ring, bg }) => (
                 <button
                   key={key}
@@ -254,6 +257,8 @@ export function AdminPage() {
               data={buildMonthly(stats.monthlyActive, 'licenses')} />}
             {activeChart === 'expired' && <BarChart label="월별 만료 라이선스 (최근 6개월)" color="fill-red-400"
               data={buildMonthly(stats.monthlyExpired, 'licenses')} />}
+            {activeChart === 'trial' && <BarChart label="월별 신규 무료체험 (최근 6개월)" color="fill-amber-400"
+              data={buildMonthly(stats.monthlyTrial, 'licenses')} />}
           </div>
         </>
       )}

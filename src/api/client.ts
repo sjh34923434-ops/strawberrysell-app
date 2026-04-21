@@ -119,7 +119,14 @@ export const authApi = {
   },
 
   me: async () => {
-    const { data } = await api.get<{ id: string; email: string; isAdmin: boolean; status: string }>('/auth/me')
+    const { data } = await api.get<{
+      id: string
+      email: string
+      isAdmin: boolean
+      status: string
+      licenseExpiresAt: string | null
+      licensePlan: string | null
+    }>('/auth/me')
     return data
   },
 
@@ -134,10 +141,16 @@ export const authApi = {
 
   activate: async (licenseKey: string) => {
     try {
-      const { data } = await api.post<{ user: { id: string; email: string; isAdmin: boolean; status: string } }>(
-        '/auth/activate',
-        { licenseKey }
-      )
+      const { data } = await api.post<{
+        user: {
+          id: string
+          email: string
+          isAdmin: boolean
+          status: string
+          licenseExpiresAt: string | null
+          licensePlan: string | null
+        }
+      }>('/auth/activate', { licenseKey })
       return data
     } catch (err) {
       throw new Error(parseError(err))
@@ -192,7 +205,7 @@ export const coupangApi = {
   confirmShipments: async (
     bizId: string,
     connId: string,
-    shipments: { shipmentBoxId: string; deliveryCompanyCode: string; invoiceNumber: string }[]
+    shipments: { shipmentBoxId: string; orderId?: string; vendorItemId?: string; deliveryCompanyCode: string; invoiceNumber: string }[]
   ) => {
     try {
       const { data } = await api.post<{ code: string; message: string; data?: unknown }>(

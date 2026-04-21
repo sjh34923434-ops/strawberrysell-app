@@ -14,7 +14,7 @@ import { useBusinessStore } from '../stores/businessStore'
 import { useSettingsStore, type MarketType } from '../stores/settingsStore'
 import { api, coupangApi, naverApi } from '../api/client'
 import { InvoiceMatchTab } from '../components/InvoiceMatchTab'
-import { fillB2bFromOrder } from '../utils/fillMapper'
+import { fillB2bFromOrder, autoMatchColumns, type ColumnMapping } from '../utils/fillMapper'
 import { buildExportFileName, downloadFilledB2b } from '../utils/excelWriter'
 
 
@@ -227,8 +227,12 @@ export function CoupangAutoPage() {
       setFetchProgress(100)
       await new Promise(r => setTimeout(r, 300))
       setFetchedOrders(orders)
-      if (orders.length > 0) {
-        saveOrder('coupang-api', Object.keys(orders[0]), orders as Record<string, unknown>[])
+      // 배송지시/배송중/배송완료 건은 저장 제외 (이미 배송 시작 → 송장번호 추가 대상 아님)
+      const SHIPPED_STATUSES = new Set(['배송지시', '배송중', '배송완료'])
+      const toSave = orders.filter(o => !SHIPPED_STATUSES.has(String(o['주문상태'])))
+      if (toSave.length > 0) {
+        const fetchLabel = `${selectedMarket}_${startDate}~${endDate}`
+        saveOrder('coupang-api', Object.keys(toSave[0]), toSave as Record<string, unknown>[], fetchLabel)
       }
 
       // 쿠팡: 신규주문 자동 발주확인처리 → 상품준비중
@@ -305,8 +309,17 @@ export function CoupangAutoPage() {
     const marketMapping = selectedMarket
       ? partner.marketMappings?.find(m => m.marketType === selectedMarket)
       : undefined
-    const mapping    = marketMapping?.mapping    ?? partner.mapping
-    const appendVals = marketMapping?.appendValues ?? partner.appendValues
+    const savedMapping = marketMapping?.mapping    ?? partner.mapping       ?? {}
+    const appendVals   = marketMapping?.appendValues ?? partner.appendValues ?? {}
+
+    // 저장된 매핑 우선, 빈 슬롯은 쿠팡 주문 헤더 기반 autoMatchColumns로 보완
+    const orderHeaders = orders.length > 0 ? Object.keys(orders[0]) : []
+    const autoMapping  = autoMatchColumns(orderHeaders, partner.b2bHeaders)
+    const mapping: ColumnMapping = { ...autoMapping }
+    for (const [b2bCol, orderCol] of Object.entries(savedMapping)) {
+      if (orderCol) mapping[b2bCol] = orderCol
+    }
+
     const { rows }   = fillB2bFromOrder(orders, partner.b2bHeaders, mapping, appendVals)
     const baseName   = (partner.b2bFileName ?? partnerName).replace(/\.xlsx?$/i, '')
     const fileName   = buildExportFileName(baseName, fileNameDateEnabled, fileNameDateFormat)
@@ -837,7 +850,23 @@ export function CoupangAutoPage() {
 
         {/* 송장번호 추가 탭 */}
         {activeTab === 'invoice' && (
-          <InvoiceMatchTab source="coupang-api" marketType={selectedMarket ?? '쿠팡'} />
+          <>
+            <InvoiceMatchTab source="coupang-api" marketType={selectedMarket ?? '쿠팡'} />
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => {
+                  setSelectedMarket(null)
+                  setStep(1)
+                  setFetchedOrders(null)
+                  setMatchResult({})
+                  setActiveTab('match')
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-slate-300 bg-dark-card border border-dark-border hover:text-slate-100 hover:border-slate-600 transition-all"
+              >
+                <ChevronLeft size={16} /> 뒤로가기
+              </button>
+            </div>
+          </>
         )}
           </>
         )}

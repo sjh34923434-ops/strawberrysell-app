@@ -410,13 +410,15 @@ export function B2bPartnersPage() {
               </>
             ) : tab === 'invoice' ? (
               <>
-                <span className="font-semibold text-amber-400">마켓 송장등록 양식</span>은 쿠팡·스마트스토어 등 마켓에
-                송장번호를 업로드할 때 쓰는 양식이에요. <span className="text-slate-300">컬럼 설정</span>을 등록하면 결과 파일이 마켓 양식에 맞게 자동 변환됩니다.
+                <span className="font-semibold text-amber-400">마켓 송장등록 양식</span>은 <span className="text-red-400">자체 업로드 양식을 요구하는 까다로운 마켓</span>(컬럼명/순서가 다른 경우)에만 필요해요.
+                양식을 등록해두면 매칭 결과가 해당 마켓 양식에 맞게 <span className="text-slate-300">자동 변환</span>됩니다.
+                <span className="block mt-1.5 text-xs text-slate-400">※ 쿠팡은 API 전송이라 불필요하고, 대부분의 마켓은 주문 엑셀 그대로 올리면 되므로 등록 안 해도 됩니다.</span>
               </>
             ) : (
               <>
-                <span className="font-semibold text-amber-400">송장 매칭 프리셋</span>은 택배번호가 있는 운송장 파일의 <span className="text-slate-300">컬럼 설정</span>을 저장합니다.
-                한 번 등록하면 <span className="text-slate-300">파일 올릴 때 자동 인식 → 자동 실행</span>됩니다.
+                <span className="font-semibold text-amber-400">송장 매칭 프리셋</span>은 거래처가 보내주는 <span className="text-red-400">운송장 파일의 컬럼명이 특이할 때</span>(예: "고객성함", "연락처", "택배번호") 매칭 규칙을 저장하는 기능이에요.
+                한 번 등록하면 다음부터는 <span className="text-slate-300">파일 올릴 때 자동 인식 → 자동 실행</span>됩니다.
+                <span className="block mt-1.5 text-xs text-slate-400">※ 거래처 파일 컬럼명이 "수령인명/전화번호/운송장번호"처럼 표준적이면 자동 감지로 잘 잡히므로 등록 안 해도 됩니다.</span>
               </>
             )}
           </div>

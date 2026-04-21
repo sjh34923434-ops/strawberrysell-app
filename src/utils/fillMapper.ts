@@ -7,7 +7,7 @@ export type ColumnMapping = Record<string, string | null>;
 export const ROW_NUMBER_KEY = '__ROW_NUMBER__';
 
 /** 분리배송 Y/N 컬럼명 패턴 (출고예정일 등 제외) */
-export const SEPARATE_DELIVERY_PATTERN = /분리배송.*[YyNn\/]|분리배송\s*Y/;
+export const SEPARATE_DELIVERY_PATTERN = /^분리배송(\s*[YyNn\/].*)?$/;
 
 export interface FillResult {
   rows: ExcelRow[];
@@ -46,6 +46,11 @@ const SYNONYM_GROUPS: string[][] = [
   ['주문자연락처', '주문자전화', '주문자전화번호'],
   ['배송메시지', '배송메세지'],
   ['수량', '구매수'],
+  ['묶음배송번호', '출고번호', 'shipmentBoxId'],
+  ['옵션ID', '옵션아이디', '업체상품코드', '업체상품번호', 'vendorItemId'],
+  ['주문번호', 'orderId'],
+  ['택배사', '배송사', '배송업체', 'deliveryCompany', 'carrier'],
+  ['운송장번호', '송장번호', 'invoiceNumber', 'trackingNumber'],
 ]
 
 // 정규화된 이름 → 같은 그룹의 모든 변형들
@@ -142,13 +147,24 @@ export function autoMatchColumns(
     // 1순위: 완전 일치
     let match = orderNorm.find((o) => o.norm === bNorm);
 
-    // 2순위: 주문 컬럼이 B2B 컬럼을 포함하거나 그 반대
-    if (!match && bNorm.length >= 2) {
-      match = orderNorm.find(
-        (o) =>
-          o.norm.includes(bNorm) ||
-          (bNorm.includes(o.norm) && o.norm.length >= 2),
-      );
+    // 2순위: 동의어 그룹 매치 (예: 묶음배송번호 ↔ 출고번호)
+    if (!match) {
+      const aliases = SYNONYM_MAP[bNorm];
+      if (aliases) {
+        match = orderNorm.find((o) => aliases.includes(o.norm));
+      }
+    }
+
+    // 3순위: 한쪽이 다른 쪽을 포함
+    // - 순방향(order가 b2b 포함): b2b 3자 이상 — "주소"→"배송주소" 같은 케이스
+    // - 역방향(b2b가 order 포함): order 3자 이상 AND b2b 길이의 50% 이상
+    //   이유: 짧은 order가 긴 b2b에 우연히 포함되면 오매칭 (예: "번호"가 "통관용구매자번호"에 매칭되지 않도록)
+    if (!match) {
+      match = orderNorm.find((o) => {
+        if (o.norm.includes(bNorm) && bNorm.length >= 3) return true
+        if (bNorm.includes(o.norm) && o.norm.length >= 3 && o.norm.length * 2 >= bNorm.length) return true
+        return false
+      });
     }
 
     mapping[b2bCol] = match?.original ?? null;

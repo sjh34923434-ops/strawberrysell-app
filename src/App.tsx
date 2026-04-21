@@ -72,19 +72,35 @@ function RouterGuard({ children }: { children: React.ReactNode }) {
   const isPublic   = ['/login', '/register', '/verify-email'].includes(location.pathname)
   const isActivate = location.pathname === '/activate'
   const isLoading  = authLoading || licLoading
-  const isPending  = !import.meta.env.DEV && isAuthenticated && useAuthStore.getState().user?.status === 'pending'
+  const user       = useAuthStore.getState().user
+  const isPending  = !import.meta.env.DEV && isAuthenticated && user?.status === 'pending'
+  const isLicenseExpired =
+    !import.meta.env.DEV &&
+    isAuthenticated &&
+    !user?.isAdmin &&
+    user?.licenseExpiresAt !== null &&
+    user?.licenseExpiresAt !== undefined &&
+    new Date(user.licenseExpiresAt) < new Date()
+  const isNoLicense =
+    !import.meta.env.DEV &&
+    isAuthenticated &&
+    !user?.isAdmin &&
+    user?.status !== 'pending' &&
+    user?.licenseExpiresAt === null &&
+    user?.licensePlan === null
+  const needsActivate = isPending || isLicenseExpired || isNoLicense
 
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated && !isPublic) {
       navigate('/login', { replace: true })
     } else if (isAuthenticated && (isPublic || isActivate)) {
-      if (isPending) navigate('/activate', { replace: true })
+      if (needsActivate) navigate('/activate', { replace: true })
       else navigate('/dashboard', { replace: true })
-    } else if (isAuthenticated && isPending && !isActivate) {
+    } else if (isAuthenticated && needsActivate && !isActivate) {
       navigate('/activate', { replace: true })
     }
-  }, [isAuthenticated, isPublic, isActivate, isPending, isLoading, navigate])
+  }, [isAuthenticated, isPublic, isActivate, needsActivate, isLoading, navigate])
 
   if (isLoading) return <SplashScreen />
   return <>{children}</>

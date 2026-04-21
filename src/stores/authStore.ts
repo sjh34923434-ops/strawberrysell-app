@@ -2,10 +2,12 @@ import { create } from 'zustand'
 import { authApi } from '../api/client'
 
 interface User {
-  id:      string
-  email:   string
-  isAdmin: boolean
-  status:  string
+  id:               string
+  email:            string
+  isAdmin:          boolean
+  status:           string
+  licenseExpiresAt: string | null
+  licensePlan:      string | null
 }
 
 interface AuthState {
