@@ -8,6 +8,7 @@ interface User {
   status:           string
   licenseExpiresAt: string | null
   licensePlan:      string | null
+  planTier?:        'auto' | 'bulk' | 'single' | null
 }
 
 interface AuthState {

@@ -1,13 +1,23 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap } from 'lucide-react'
+import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { usePlanAccess, type PlanTier } from '../utils/planAccess'
 import { ThemeToggle } from './ThemeToggle'
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: string
+  icon: typeof BarChart3
+  label: string
+  tip: { title: string; rows: { label: string; value: string }[] } | null
+  requires?: PlanTier
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard',   icon: BarChart3,  label: '대시보드',   tip: null },
   {
     to: '/coupang-auto', icon: Zap, label: '자동매칭',
+    requires: 'auto',
     tip: {
       title: '자동매칭',
       rows: [
@@ -19,6 +29,7 @@ const NAV_ITEMS = [
   },
   {
     to: '/multi-match', icon: Layers,    label: '일괄매칭',
+    requires: 'bulk',
     tip: {
       title: '일괄매칭',
       rows: [
@@ -30,6 +41,7 @@ const NAV_ITEMS = [
   },
   {
     to: '/matching',    icon: GitMerge,  label: '1:1 주문매칭',
+    requires: 'single',
     tip: {
       title: '주문매칭',
       rows: [
@@ -53,13 +65,20 @@ const NAV_ITEMS = [
   { to: '/businesses',   icon: Building2,   label: '사업자 관리',   tip: null },
   { to: '/help',        icon: BookOpen,  label: '이용매뉴얼', tip: null },
   { to: '/settings',    icon: Settings,  label: '설정',      tip: null },
-] as const
+]
 
 export function Sidebar() {
   const { user, logout } = useAuthStore()
+  const { canUseAuto, canUseBulk, canUseSingle, tierLabel } = usePlanAccess()
   const navigate = useNavigate()
 
   const [openTip, setOpenTip] = useState<string | null>(null)
+
+  const accessMap: Record<string, boolean> = {
+    auto:   canUseAuto,
+    bulk:   canUseBulk,
+    single: canUseSingle,
+  }
 
   const handleLogout = async () => {
     await logout()
@@ -86,27 +105,47 @@ export function Sidebar() {
         </div>
       </div>
 
+      {/* 플랜 표시 */}
+      {tierLabel && !user?.isAdmin && (
+        <div className="mx-3 mt-3 px-3 py-2 rounded-lg bg-primary-500/5 border border-primary-500/15">
+          <p className="text-[11px] text-slate-500 leading-none mb-1">현재 플랜</p>
+          <p className="text-xs font-semibold text-primary-400">{tierLabel}</p>
+        </div>
+      )}
+
       {/* 네비게이션 */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, label, tip }) => (
+        {NAV_ITEMS.map(({ to, icon: Icon, label, tip, requires }) => {
+          const locked = !!requires && !accessMap[requires]
+          return (
           <div key={to} className="relative">
             <div className="flex items-center gap-1">
               <NavLink
                 to={to}
+                onClick={(e) => {
+                  if (locked) {
+                    e.preventDefault()
+                    navigate('/activate')
+                  }
+                }}
                 className={({ isActive }) => `
                   flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                   transition-all duration-150
-                  ${isActive
-                    ? 'bg-primary-500/10 text-primary-400 dark:text-primary-400'
-                    : 'text-slate-400 dark:text-slate-400 text-gray-600 hover:bg-dark-hover dark:hover:bg-dark-hover hover:bg-gray-100 hover:text-slate-100 dark:hover:text-slate-100 hover:text-gray-900'
+                  ${locked
+                    ? 'text-slate-600 dark:text-slate-600 text-gray-400 hover:bg-dark-hover/50 dark:hover:bg-dark-hover/50 hover:bg-gray-100 cursor-pointer'
+                    : isActive
+                      ? 'bg-primary-500/10 text-primary-400 dark:text-primary-400'
+                      : 'text-slate-400 dark:text-slate-400 text-gray-600 hover:bg-dark-hover dark:hover:bg-dark-hover hover:bg-gray-100 hover:text-slate-100 dark:hover:text-slate-100 hover:text-gray-900'
                   }
                 `}
+                title={locked ? '상위 플랜에서 사용 가능 — 클릭하여 업그레이드' : undefined}
               >
                 {({ isActive }) => (
                   <>
-                    <Icon size={18} className={isActive ? 'text-primary-400' : ''} />
+                    <Icon size={18} className={!locked && isActive ? 'text-primary-400' : ''} />
                     <span className="flex-1">{label}</span>
-                    {isActive && <ChevronRight size={14} className="text-primary-400" />}
+                    {locked && <Lock size={12} className="text-slate-500" />}
+                    {!locked && isActive && <ChevronRight size={14} className="text-primary-400" />}
                   </>
                 )}
               </NavLink>
@@ -140,11 +179,18 @@ export function Sidebar() {
                       <span className="text-[15px] text-slate-300 dark:text-slate-300 text-gray-700 leading-relaxed">{value}</span>
                     </div>
                   ))}
+                  {locked && (
+                    <div className="mt-2 pt-2 border-t border-primary-500/15">
+                      <p className="text-[12px] text-amber-400 flex items-center gap-1">
+                        <Lock size={11} /> 상위 플랜에서 사용 가능
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
-        ))}
+        )})}
       </nav>
 
       {/* 하단 영역 */}

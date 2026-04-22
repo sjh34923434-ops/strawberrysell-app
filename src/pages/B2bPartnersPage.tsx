@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Database, Plus, Pencil, Trash2, Tag, X,
   CheckCircle2, FileSpreadsheet, AlertCircle, Store, Truck, Zap,
@@ -133,6 +134,9 @@ export function B2bPartnersPage() {
     marketTemplates, saveMarketTemplate, updateMarketTemplate, deleteMarketTemplate,
     supplierMappingPresets, saveSupplierMappingPreset, updateSupplierMappingPreset, deleteSupplierMappingPreset,
   } = useSettingsStore()
+
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const [tab,       setTab]       = useState<Tab>('b2b')
   const [formOpen,  setFormOpen]  = useState(false)
@@ -337,6 +341,31 @@ export function B2bPartnersPage() {
 
   const fallbackOrderHeaders = isB2b ? ORDER_HEADERS : INVOICE_HEADERS
   const orderHeaders = form.marketHeaders.length > 0 ? form.marketHeaders : fallbackOrderHeaders
+
+  // 온보딩 체크리스트 deep-link 처리
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const action = params.get('action')
+    if (!action) return
+
+    if (action === 'add-partner') {
+      setTab('b2b')
+      openAdd()
+    } else if (action === 'edit-partner') {
+      setTab('b2b')
+      if (coupangPartners.length > 0) {
+        openEditB2b(coupangPartners[0])
+        if (params.get('focus') === 'mapping') {
+          setTimeout(() => {
+            document.getElementById('mapping-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 300)
+        }
+      } else {
+        openAdd()
+      }
+    }
+    navigate('/b2b-partners', { replace: true })
+  }, [location.search])
 
   return (
     <div className="flex-1 overflow-y-auto bg-dark-bg">
@@ -761,7 +790,7 @@ export function B2bPartnersPage() {
 
             {/* 컬럼 매핑 */}
             {form.headers.length > 0 && (
-              <div className="rounded-2xl border border-dark-border bg-dark-card p-5 animate-fade-in">
+              <div id="mapping-section" className="rounded-2xl border border-dark-border bg-dark-card p-5 animate-fade-in">
                 <ColumnMapper
                   orderHeaders={orderHeaders}
                   b2bHeaders={form.headers}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CheckCircle2, Circle, ArrowRight, ChevronDown, X } from 'lucide-react'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useBusinessStore } from '../stores/businessStore'
@@ -8,21 +8,23 @@ const DISMISSED_KEY = 'onboarding-dismissed'
 
 export function OnboardingChecklist() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { coupangPartners } = useSettingsStore()
   const { businesses }      = useBusinessStore()
   const [collapsed, setCollapsed] = useState(false)
   const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISSED_KEY))
 
-  const hasPartner    = coupangPartners.length > 0
-  const hasB2b        = coupangPartners.some(p => p.b2bFileData)
-  const hasMapping    = coupangPartners.some(p => p.b2bHeaders.length > 0 && Object.keys(p.mapping ?? {}).length > 0)
-  const hasConnection = businesses.some(b => b.connections?.length > 0)
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1'
+
+  const hasPartner    = !isPreview && coupangPartners.length > 0
+  const hasB2b        = !isPreview && coupangPartners.some(p => p.b2bFileData)
+  const hasMapping    = !isPreview && coupangPartners.some(p => p.b2bHeaders.length > 0 && Object.keys(p.mapping ?? {}).length > 0)
+  const hasConnection = !isPreview && businesses.some(b => b.connections?.length > 0)
 
   const steps = [
-    { label: '거래처 등록',          done: hasPartner,    desc: '거래처관리에서 거래처를 추가하세요',              path: '/b2b-partners' },
-    { label: 'B2B 양식 등록',        done: hasB2b,        desc: '거래처에 B2B 주문양식 파일을 등록하세요',         path: '/b2b-partners' },
-    { label: '컬럼 매핑 완료',       done: hasMapping,    desc: '마켓별 컬럼 매핑을 설정하세요',                   path: '/b2b-partners' },
-    { label: '마켓 API 연동',         done: hasConnection, desc: '사업자관리에서 쿠팡/스마트스토어를 연동하세요',   path: '/businesses'   },
+    { label: '거래처 등록',                done: hasPartner,            desc: '거래처관리에서 거래처를 추가하세요',              path: '/b2b-partners?action=add-partner' },
+    { label: 'B2B 양식 등록 + 컬럼 매핑',   done: hasB2b && hasMapping,  desc: '거래처 편집에서 양식 파일 업로드 후 컬럼 매핑을 완료하세요', path: '/b2b-partners?action=edit-partner' },
+    { label: '마켓 API 연동',              done: hasConnection,         desc: '사업자관리에서 쿠팡/스마트스토어를 연동하세요',   path: '/businesses?action=add-connection' },
   ]
 
   const doneCount = steps.filter(s => s.done).length
@@ -33,7 +35,7 @@ export function OnboardingChecklist() {
     setDismissed(true)
   }
 
-  if (dismissed) return null
+  if (dismissed && !isPreview) return null
 
   return (
     <div className={`bg-dark-card border rounded-2xl overflow-hidden transition-all ${

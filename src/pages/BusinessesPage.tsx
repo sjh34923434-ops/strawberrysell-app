@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Loader2, Wifi, WifiOff, Pencil, Check, AlertCircle, Building2, ChevronDown, ChevronUp, Save, GripVertical } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -234,6 +235,27 @@ export function BusinessesPage() {
       setActiveId(businesses[0].id)
     }
   }, [businesses])
+
+  // 온보딩 체크리스트 deep-link 처리
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const action = params.get('action')
+    if (!action) return
+
+    if (action === 'add-business') {
+      setShowAddBiz(true)
+    } else if (action === 'add-connection') {
+      if (businesses.length === 0) {
+        setShowAddBiz(true)
+      } else {
+        if (!activeId) setActiveId(businesses[0].id)
+        setShowAddConn(true)
+      }
+    }
+    navigate('/businesses', { replace: true })
+  }, [location.search, businesses.length])
 
   const activeBusiness = businesses.find(b => b.id === activeId) ?? null
 

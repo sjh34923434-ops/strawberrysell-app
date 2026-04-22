@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/authStore'
 import { useLicenseStore } from './stores/licenseStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { isEnabled } from './utils/featureFlags'
+import { usePlanAccess, type PlanTier } from './utils/planAccess'
 
 import { Sidebar }         from './components/Sidebar'
 import { ChatBubble }      from './components/chat/ChatBubble'
@@ -25,6 +26,13 @@ import { B2bPartnersPage } from './pages/B2bPartnersPage'
 
 // ─── 인증 보호 레이아웃 ────────────────────────────────────────────────────────
 
+function PlanGate({ requires, children }: { requires: PlanTier; children: React.ReactNode }) {
+  const { canUseAuto, canUseBulk, canUseSingle } = usePlanAccess()
+  const has = requires === 'auto' ? canUseAuto : requires === 'bulk' ? canUseBulk : canUseSingle
+  if (!has) return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
 function AppLayout() {
   return (
     <div className="flex min-h-screen bg-dark-bg dark:bg-dark-bg bg-gray-50">
@@ -33,9 +41,9 @@ function AppLayout() {
       <main className="flex flex-col flex-1 min-w-0">
         <Routes>
           <Route path="/dashboard"    element={<DashboardPage />} />
-          <Route path="/matching"     element={<MatchingPage />} />
-          <Route path="/multi-match"  element={<MultiMatchPage />} />
-          <Route path="/coupang-auto" element={<CoupangAutoPage />} />
+          <Route path="/matching"     element={<PlanGate requires="single"><MatchingPage /></PlanGate>} />
+          <Route path="/multi-match"  element={<PlanGate requires="bulk"><MultiMatchPage /></PlanGate>} />
+          <Route path="/coupang-auto" element={<PlanGate requires="auto"><CoupangAutoPage /></PlanGate>} />
           <Route path="/settings"     element={<SettingsPage />} />
           <Route path="/help"         element={<HelpPage />} />
           <Route path="/admin"        element={<AdminPage />} />

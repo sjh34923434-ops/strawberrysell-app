@@ -52,77 +52,138 @@ function SectionWrap({ title, children }: { title: string; children: React.React
 function FullFlowSection() {
   return (
     <SectionWrap title="🔄 전체 발주 프로세스 한눈에 보기">
-      <div className="mt-5 space-y-3">
-        <div className="flex flex-col gap-2">
+      <div className="mt-5 space-y-4">
 
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-sky-500/20 text-sky-300 text-sm font-bold shrink-0">1</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-sky-300">주문 접수</p>
-              <p className="text-sm text-slate-400 mt-0.5">마켓(쿠팡·스마트스토어 등) 주문 엑셀 다운로드 또는 자동매칭 탭에서 API로 자동 수집</p>
+        {/* 자동 vs 수동 요약 카드 */}
+        <div className="rounded-xl border border-dark-border bg-dark-hover/30 p-4">
+          <p className="text-xs text-slate-400 text-center mb-3 leading-relaxed">
+            6단계 중 <span className="text-primary-300 font-bold">① ② ③</span> 은 딸기셀이 <span className="text-primary-200 font-bold">한 번에 자동 처리</span>,{' '}
+            <span className="text-amber-300 font-bold">④</span> 는 <span className="text-amber-200 font-bold">사람·거래처가 직접</span>,{' '}
+            <span className="text-primary-300 font-bold">⑤ ⑥</span> 은 다시 <span className="text-primary-200 font-bold">한 번에 자동 처리</span>됩니다.
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+            <div className="py-2 rounded-lg bg-primary-500/10 border border-primary-500/30">
+              <p className="text-primary-300 font-bold">1·2·3 자동</p>
+              <p className="text-slate-400 mt-0.5">주문수집→분류→B2B</p>
             </div>
-            <FileSpreadsheet size={16} className="text-sky-400 shrink-0" />
-          </div>
-
-          <Arrow vertical />
-
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/20 text-violet-300 text-sm font-bold shrink-0">2</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-violet-300">일괄매칭 <span className="text-sm font-normal text-slate-500">— 거래처가 여럿일 때</span></p>
-              <p className="text-sm text-slate-400 mt-0.5">주문파일 1개 → 거래처별 B2B 파일 N개로 분류 (마켓 선택 후 실행)</p>
+            <div className="py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <p className="text-amber-300 font-bold">4 수동</p>
+              <p className="text-slate-400 mt-0.5">거래처 전송·출고</p>
             </div>
-            <Layers size={16} className="text-violet-400 shrink-0" />
-          </div>
-
-          <div className="flex items-center gap-2 pl-4">
-            <div className="w-px h-4 bg-slate-600" />
-            <p className="text-sm text-slate-500">거래처가 1곳이면 1:1 주문매칭으로 바로 이동</p>
-          </div>
-
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-500/10 border border-primary-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-500/20 text-primary-300 text-sm font-bold shrink-0">3</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-primary-300">주문매칭 → B2B 입력</p>
-              <p className="text-sm text-slate-400 mt-0.5">B2B 양식에 주문 데이터 채워서 다운로드 → 거래처에 전송</p>
+            <div className="py-2 rounded-lg bg-primary-500/10 border border-primary-500/30">
+              <p className="text-primary-300 font-bold">5·6 자동</p>
+              <p className="text-slate-400 mt-0.5">송장매칭→쿠팡 전송</p>
             </div>
-            <GitMerge size={16} className="text-primary-400 shrink-0" />
           </div>
-
-          <Arrow vertical />
-
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-500/10 border border-slate-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-500/20 text-slate-300 text-sm font-bold shrink-0">4</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-slate-300">거래처 출고 처리</p>
-              <p className="text-sm text-slate-400 mt-0.5">거래처가 B2B 파일 받아 출고 → 택배번호가 있는 운송장 파일 회신 (1~3일 소요)</p>
-            </div>
-            <Package size={16} className="text-slate-400 shrink-0" />
-          </div>
-
-          <Arrow vertical />
-
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/20 text-amber-300 text-sm font-bold shrink-0">5</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-amber-300">송장번호 추가 탭</p>
-              <p className="text-sm text-slate-400 mt-0.5">운송장 파일 업로드 → 주문 파일에 송장번호 자동 매칭</p>
-            </div>
-            <Truck size={16} className="text-amber-400 shrink-0" />
-          </div>
-
-          <Arrow vertical />
-
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-bold shrink-0">6</div>
-            <div className="flex-1">
-              <p className="text-base font-semibold text-emerald-300">마켓 송장 업로드 완료</p>
-              <p className="text-sm text-slate-400 mt-0.5">생성된 파일을 마켓 판매자센터에 업로드 또는 쿠팡은 API로 자동 전송</p>
-            </div>
-            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-          </div>
-
         </div>
+
+        {/* ── GROUP A: 자동 (1·2·3) ───────────────────── */}
+        <div className="relative rounded-xl border-2 border-primary-500/40 bg-primary-500/5 p-4 mt-4">
+          <div className="absolute -top-2.5 left-4 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-dark-card border border-primary-500/50 text-[11px] font-bold text-primary-300">
+            <Zap size={10} />
+            자동 · 딸기셀이 한 번에 처리
+          </div>
+
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-sky-500/20 text-sky-300 text-sm font-bold shrink-0">1</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-sky-300">주문 접수</p>
+                <p className="text-sm text-slate-400 mt-0.5">마켓(쿠팡·스마트스토어 등) 주문 엑셀 다운로드 또는 자동매칭 탭에서 API로 자동 수집</p>
+              </div>
+              <FileSpreadsheet size={16} className="text-sky-400 shrink-0" />
+            </div>
+
+            <Arrow vertical />
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/20 text-violet-300 text-sm font-bold shrink-0">2</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-violet-300">일괄매칭 <span className="text-sm font-normal text-slate-500">— 거래처가 여럿일 때</span></p>
+                <p className="text-sm text-slate-400 mt-0.5">주문파일 1개 → 거래처별 B2B 파일 N개로 분류 (마켓 선택 후 실행)</p>
+              </div>
+              <Layers size={16} className="text-violet-400 shrink-0" />
+            </div>
+
+            <div className="flex items-center gap-2 pl-4">
+              <div className="w-px h-4 bg-slate-600" />
+              <p className="text-sm text-slate-500">거래처가 1곳이면 1:1 주문매칭으로 바로 이동</p>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-500/10 border border-primary-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-500/20 text-primary-300 text-sm font-bold shrink-0">3</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-primary-300">주문매칭 → B2B 양식 자동 입력</p>
+                <p className="text-sm text-slate-400 mt-0.5">B2B 양식에 주문 데이터 자동으로 채워서 다운로드 완료</p>
+              </div>
+              <GitMerge size={16} className="text-primary-400 shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        <Arrow vertical />
+
+        {/* ── GROUP B: 수동 (3.5 거래처 전송 + 4 출고) ────── */}
+        <div className="relative rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-4">
+          <div className="absolute -top-2.5 left-4 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-dark-card border border-amber-500/50 text-[11px] font-bold text-amber-300">
+            수동 · 사람·거래처가 직접 처리
+          </div>
+
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold shrink-0">3.5</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-amber-300">거래처 전송</p>
+                <p className="text-sm text-slate-400 mt-0.5">다운로드한 B2B 파일을 거래처에 전달 <span className="text-amber-300/80">(직접)</span></p>
+              </div>
+              <Upload size={16} className="text-amber-400 shrink-0" />
+            </div>
+
+            <Arrow vertical />
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-500/10 border border-slate-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-500/20 text-slate-300 text-sm font-bold shrink-0">4</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-slate-300">거래처 출고 처리</p>
+                <p className="text-sm text-slate-400 mt-0.5">거래처가 B2B 파일 받아 출고 → 택배번호가 있는 운송장 파일 회신</p>
+              </div>
+              <Package size={16} className="text-slate-400 shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        <Arrow vertical />
+
+        {/* ── GROUP C: 자동 (5·6) ──────────────────────── */}
+        <div className="relative rounded-xl border-2 border-primary-500/40 bg-primary-500/5 p-4">
+          <div className="absolute -top-2.5 left-4 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-dark-card border border-primary-500/50 text-[11px] font-bold text-primary-300">
+            <Zap size={10} />
+            자동 · 딸기셀이 한 번에 처리
+          </div>
+
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/20 text-amber-300 text-sm font-bold shrink-0">5</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-amber-300">송장번호 추가 탭</p>
+                <p className="text-sm text-slate-400 mt-0.5">운송장 파일 업로드 → 주문 파일에 송장번호 자동 매칭</p>
+              </div>
+              <Truck size={16} className="text-amber-400 shrink-0" />
+            </div>
+
+            <Arrow vertical />
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-bold shrink-0">6</div>
+              <div className="flex-1">
+                <p className="text-base font-semibold text-emerald-300">마켓 송장 업로드 완료</p>
+                <p className="text-sm text-slate-400 mt-0.5">생성된 파일을 마켓 판매자센터에 업로드 또는 쿠팡은 API로 자동 전송</p>
+              </div>
+              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            </div>
+          </div>
+        </div>
+
       </div>
     </SectionWrap>
   )
@@ -144,18 +205,18 @@ function B2bSection() {
           {[
             {
               icon: FileSpreadsheet, color: 'text-primary-400 border-primary-500/20 bg-primary-500/5',
-              label: '① B2B 주문 양식',
+              label: '① B2B 주문 양식 (필수)',
               desc: '거래처(도매처)에 보내는 발주서 엑셀 파일과 컬럼 설정을 저장합니다.\n마켓별로 주문 컬럼이 다를 수 있으므로 마켓 탭을 선택해 각각 저장하세요.',
             },
             {
               icon: Truck, color: 'text-amber-400 border-amber-500/20 bg-amber-500/5',
-              label: '② 송장 매칭 프리셋',
-              desc: '택배번호가 있는 운송장 파일의 컬럼 설정을 저장합니다.\n한 번 등록하면 파일 올릴 때 자동 인식 → 자동 실행됩니다.\n마켓별로 분리 저장되므로 마켓이 달라도 올바른 설정이 적용됩니다.',
+              label: '② 송장 매칭 프리셋 (선택)',
+              desc: '거래처가 보내주는 운송장 파일 컬럼명이 특이할 때(예: "고객성함", "연락처", "택배번호") 매칭 규칙을 저장하는 기능입니다.\n한 번 등록하면 파일 올릴 때 자동 인식 → 자동 실행됩니다.\n※ 컬럼명이 "수령인명/전화번호/운송장번호"처럼 표준적이면 자동 감지로 잡히므로 등록 안 해도 됩니다.',
             },
             {
               icon: Store, color: 'text-violet-400 border-violet-500/20 bg-violet-500/5',
-              label: '③ 마켓 송장등록 양식',
-              desc: '쿠팡·스마트스토어 등 마켓에 송장번호를 업로드할 때 쓰는 양식 파일과 컬럼 설정을 저장합니다.',
+              label: '③ 마켓 송장등록 양식 (선택)',
+              desc: '자체 업로드 양식을 요구하는 까다로운 마켓에만 필요합니다.\n양식을 등록해두면 매칭 결과가 해당 마켓 양식에 맞게 자동 변환됩니다.\n※ 쿠팡은 API 전송이라 불필요, 대부분의 마켓은 주문 엑셀 그대로 올리면 되므로 등록 안 해도 됩니다.',
             },
           ].map((item, i) => (
             <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl border ${item.color}`}>
@@ -433,7 +494,7 @@ function InvoiceSection() {
           },
           {
             num: 4, label: '결과 다운로드 / 쿠팡 자동 전송',
-            desc: '매칭 완료 파일을 엑셀로 다운로드합니다.\n쿠팡의 경우 API로 직접 송장 전송도 가능합니다.',
+            desc: '매칭 완료된 행만 골라서 엑셀 다운로드가 가능합니다. (미매칭 행은 제외)\n쿠팡의 경우 "쿠팡 송장 전송" 버튼으로 API를 통해 판매자센터에 직접 업로드됩니다. (엑셀 저장 불필요)',
           },
         ].map((s, i) => (
           <div key={s.num}>
@@ -454,6 +515,12 @@ function InvoiceSection() {
           <p className="text-xs font-semibold text-sky-400">송장 매칭 프리셋 활용</p>
           <p className="text-xs text-slate-400">거래처관리 → 송장 매칭 프리셋에서 운송장 파일의 컬럼 설정을 저장해두면, 같은 형식의 파일을 올릴 때 자동 인식됩니다.</p>
           <p className="text-xs text-slate-400">프리셋은 마켓별로 분리 저장되므로 마켓이 달라도 올바른 설정이 적용됩니다.</p>
+        </div>
+
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-amber-400">⚠ 엑셀 파일이 깨져 보일 때</p>
+          <p className="text-xs text-slate-400">구형 .xls 파일은 컬럼명이 깨지거나 일부 데이터가 누락될 수 있어요. 업로드 시 경고 배너가 자동으로 표시됩니다.</p>
+          <p className="text-xs text-slate-400">엑셀에서 파일을 열고 [다른 이름으로 저장] → "Excel 통합 문서(*.xlsx)" 형식으로 저장 후 다시 업로드해주세요.</p>
         </div>
 
       </div>
@@ -615,6 +682,21 @@ const TEXT_SECTIONS = [
       {
         q: '어떻게 설정하나요?',
         a: '컬럼 매핑 화면에서 각 B2B 컬럼 오른쪽의 "추가" 버튼을 클릭하면 입력창이 열립니다.\n입력한 텍스트는 매핑 저장 시 함께 저장됩니다.',
+      },
+    ],
+  },
+  {
+    id: 'trouble',
+    title: '파일 깨짐 / 미매칭 문제',
+    color: 'text-amber-400 bg-amber-500/10',
+    items: [
+      {
+        q: '컬럼명에 이상한 문자가 나오고 미매칭이 많이 나와요',
+        a: '구형 .xls 파일이 깨진 경우일 가능성이 높습니다. 업로드 시 상단에 경고 배너가 자동 표시됩니다.\n해결: 엑셀에서 파일을 연 뒤 [다른 이름으로 저장] → "Excel 통합 문서(*.xlsx)" 선택 후 저장 → 다시 업로드해주세요.',
+      },
+      {
+        q: '쿠팡 송장 전송 중 일부만 실패하면 어떻게 하나요?',
+        a: '실패한 건만 다시 시도할 수 있습니다. 엑셀을 수정(취소 건 제외)해서 재업로드하거나, 남은 주문은 다음날 추가 매칭 후 전송해도 됩니다.\n쿠팡 API는 이미 전송된 송장을 중복 업데이트해도 안전하게 처리합니다.',
       },
     ],
   },
