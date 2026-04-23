@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck, Ban, ShieldCheck } from 'lucide-react'
-import { api } from '../api/client'
+import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck, Ban, ShieldCheck, Loader2, Building2, Pencil } from 'lucide-react'
+import { api, appSettingsApi, partnerCompanyApi, type PartnerCompany } from '../api/client'
 
 interface License {
   id:          string
@@ -96,8 +96,23 @@ export function AdminPage() {
   // 라이선스 발급 폼
   const [plan,  setPlan]  = useState('1month')
   const [count, setCount] = useState(1)
+  const [planTier,  setPlanTier]  = useState<'auto' | 'bulk' | 'single'>('single')
+  const [label,     setLabel]     = useState('')
+  const [issuedTo,  setIssuedTo]  = useState('')
+  const [issueNotes,setIssueNotes]= useState('')
   const [newKeys,   setNewKeys]   = useState<string[]>([])
   const [copied,    setCopied]    = useState<string | null>(null)
+
+  // 발급 프리셋
+  const applyPreset = (preset: 'official' | 'beta' | 'partner') => {
+    if (preset === 'official') {
+      setPlan('1month'); setPlanTier('single'); setLabel(''); setIssuedTo(''); setIssueNotes('')
+    } else if (preset === 'beta') {
+      setPlan('3month'); setPlanTier('auto'); setLabel('베타테스터'); setIssuedTo(''); setIssueNotes('베타 테스트 참여 - 발급일 + 90일')
+    } else {
+      setPlan('3month'); setPlanTier('auto'); setLabel('협업'); setIssuedTo(''); setIssueNotes('협업 라이선스')
+    }
+  }
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -141,6 +156,10 @@ export function AdminPage() {
       const { data } = await api.post<{ keys: string[] }>('/admin/licenses', {
         plan,
         count,
+        planTier,
+        label:    label || undefined,
+        issuedTo: issuedTo || undefined,
+        notes:    issueNotes || undefined,
       })
       setNewKeys(data.keys)
       await loadData()
@@ -218,6 +237,9 @@ export function AdminPage() {
         </button>
       </div>
 
+      {/* 쿠팡 OpenAPI 안내 값 편집 */}
+      <CoupangOpenapiAdminEditor />
+
       {/* 통계 */}
       {stats && (
         <>
@@ -289,16 +311,30 @@ export function AdminPage() {
         <div className="flex flex-col gap-4">
           {/* 발급 폼 */}
           <div className="bg-dark-card border border-dark-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-slate-200 mb-4 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
               <Plus size={14} /> 라이선스 발급
             </h3>
-            <div className="flex flex-wrap gap-3 items-end">
+
+            {/* 프리셋 */}
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => applyPreset('official')} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-dark-border hover:border-primary-500/40 hover:bg-primary-500/5 text-slate-300 transition-all">
+                🎫 정식 발급
+              </button>
+              <button onClick={() => applyPreset('beta')} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-dark-border hover:border-amber-500/40 hover:bg-amber-500/5 text-slate-300 transition-all">
+                🧪 베타 키 (3개월 무료·전체)
+              </button>
+              <button onClick={() => applyPreset('partner')} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-dark-border hover:border-purple-500/40 hover:bg-purple-500/5 text-slate-300 transition-all">
+                🤝 협업 키 (3개월 무료·전체)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">플랜</label>
+                <label className="block text-xs text-slate-400 mb-1">플랜 (기간)</label>
                 <select
                   value={plan}
                   onChange={(e) => setPlan(e.target.value)}
-                  className="px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="1month_free">1개월 무료</option>
                   <option value="1month">1개월</option>
@@ -309,6 +345,18 @@ export function AdminPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-xs text-slate-400 mb-1">플랜 티어 (기기 수)</label>
+                <select
+                  value={planTier}
+                  onChange={(e) => setPlanTier(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="single">1:1 주문매칭 (1대)</option>
+                  <option value="bulk">일괄매칭 (2대)</option>
+                  <option value="auto">자동매칭 (3대)</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs text-slate-400 mb-1">수량</label>
                 <input
                   type="number"
@@ -316,16 +364,47 @@ export function AdminPage() {
                   max={50}
                   value={count}
                   onChange={(e) => setCount(Number(e.target.value))}
-                  className="w-20 px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              <button
-                onClick={createLicenses}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white transition-all"
-              >
-                <Key size={13} /> 발급하기
-              </button>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">라벨</label>
+                <input
+                  type="text"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="정식 / 베타 / 협업 / 이벤트"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">받는 사람</label>
+                <input
+                  type="text"
+                  value={issuedTo}
+                  onChange={(e) => setIssuedTo(e.target.value)}
+                  placeholder="김OO / 씨앗마트 등"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">메모</label>
+                <input
+                  type="text"
+                  value={issueNotes}
+                  onChange={(e) => setIssueNotes(e.target.value)}
+                  placeholder="발급 이유, 연락처 등"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
             </div>
+
+            <button
+              onClick={createLicenses}
+              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white transition-all"
+            >
+              <Key size={13} /> 발급하기
+            </button>
 
             {newKeys.length > 0 && (
               <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -341,6 +420,9 @@ export function AdminPage() {
               </div>
             )}
           </div>
+
+          {/* 협력업체 관리 */}
+          <PartnerCompaniesPanel />
 
           {/* 목록 */}
           <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
@@ -462,6 +544,304 @@ export function AdminPage() {
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 쿠팡 OpenAPI 안내 값 편집 ────────────────────────────────────────────────
+
+function CoupangOpenapiAdminEditor() {
+  const [name, setName] = useState('')
+  const [url,  setUrl]  = useState('')
+  const [ip,   setIp]   = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+
+  useEffect(() => {
+    appSettingsApi.getCoupangOpenapi()
+      .then(info => {
+        setName(info.name)
+        setUrl(info.url)
+        setIp(info.ip)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    setSaved(false)
+    try {
+      await appSettingsApi.updateCoupangOpenapi({ name, url, ip })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-dark-card border border-dark-border rounded-xl p-5 flex items-center gap-2 text-xs text-slate-500">
+        <Loader2 size={12} className="animate-spin" /> 불러오는 중...
+      </div>
+    )
+  }
+
+  const FIELDS: Array<{ label: string; value: string; setter: (v: string) => void; mono?: boolean }> = [
+    { label: '이름',     value: name, setter: setName },
+    { label: '주소 URL', value: url,  setter: setUrl },
+    { label: 'IP 주소',  value: ip,   setter: setIp, mono: true },
+  ]
+
+  return (
+    <div className="bg-dark-card border border-dark-border rounded-xl p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-200">쿠팡 OpenAPI 안내 값</p>
+          <p className="text-xs text-slate-500 mt-0.5">사용자에게 표시되는 "WING OpenAPI 발급" 가이드 값. IP가 바뀌면 여기서 수정</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 transition-all"
+        >
+          {saving && <Loader2 size={11} className="animate-spin" />}
+          {saved ? '저장됨 ✓' : '저장'}
+        </button>
+      </div>
+      <div className="space-y-2">
+        {FIELDS.map(({ label, value, setter, mono }) => (
+          <div key={label} className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-slate-500 w-20 shrink-0">{label}</span>
+            <input
+              type="text"
+              value={value}
+              onChange={e => setter(e.target.value)}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500 ${mono ? 'font-mono' : ''}`}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── 협력업체 관리 ────────────────────────────────────────────────────────────
+
+function PartnerCompaniesPanel() {
+  const [items, setItems]     = useState<PartnerCompany[]>([])
+  const [loading, setLoading] = useState(true)
+  const [name, setName]       = useState('')
+  const [discount, setDiscount] = useState(50)
+  const [notes, setNotes]     = useState('')
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDiscount, setEditDiscount] = useState(50)
+  const [editNotes, setEditNotes]       = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try { setItems(await partnerCompanyApi.list()) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function handleAdd() {
+    if (!name.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      await partnerCompanyApi.create(name.trim(), discount, notes || undefined)
+      setName(''); setDiscount(50); setNotes('')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '추가 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleActive(p: PartnerCompany) {
+    await partnerCompanyApi.update(p.id, { active: !p.active })
+    await load()
+  }
+
+  async function remove(p: PartnerCompany) {
+    if (!confirm(`'${p.name}' 업체를 삭제할까요?`)) return
+    await partnerCompanyApi.remove(p.id)
+    await load()
+  }
+
+  function startEdit(p: PartnerCompany) {
+    setEditingId(p.id)
+    setEditDiscount(p.discount_percent)
+    setEditNotes(p.notes ?? '')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(p: PartnerCompany) {
+    await partnerCompanyApi.update(p.id, {
+      discountPercent: editDiscount,
+      notes:           editNotes,
+    })
+    setEditingId(null)
+    await load()
+  }
+
+  return (
+    <div className="bg-dark-card border border-dark-border rounded-xl p-5">
+      <h3 className="text-sm font-semibold text-slate-200 mb-1 flex items-center gap-2">
+        <Building2 size={14} /> 협력업체 관리
+      </h3>
+      <p className="text-xs text-slate-500 mb-4">등록된 업체는 결제 시 해당 업체명 입력 → 3개월 플랜에 자동 할인 적용</p>
+
+      {/* 추가 폼 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="업체명 (예: 씨앗마트)"
+          className="px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={discount}
+            onChange={e => setDiscount(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+          <span className="text-xs text-slate-500">%</span>
+        </div>
+        <input
+          type="text"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="메모 (선택)"
+          className="px-3 py-2 rounded-lg text-sm bg-dark-hover border border-dark-border text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={saving || !name.trim()}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 transition-all"
+        >
+          <Plus size={12} /> 업체 추가
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-300">
+          <AlertCircle size={12} /> {error}
+        </div>
+      )}
+
+      {/* 목록 */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Loader2 size={12} className="animate-spin" /> 불러오는 중...
+        </div>
+      ) : items.length === 0 ? (
+        <p className="text-xs text-slate-500 py-2">등록된 협력업체가 없습니다.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {items.map(p => {
+            const isEditing = editingId === p.id
+            return (
+              <li
+                key={p.id}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all ${
+                  p.active
+                    ? 'bg-dark-hover border-dark-border'
+                    : 'bg-dark-hover/40 border-dark-border opacity-60'
+                } ${isEditing ? 'ring-1 ring-primary-500/40' : ''}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-slate-200 truncate">{p.name}</p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={editDiscount}
+                          onChange={e => setEditDiscount(Number(e.target.value))}
+                          className="w-14 px-2 py-0.5 rounded text-xs bg-dark-bg border border-primary-500/40 text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
+                        <span className="text-xs text-slate-500">%</span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-primary-500/15 text-primary-300 font-semibold shrink-0">
+                        -{p.discount_percent}%
+                      </span>
+                    )}
+                    {!p.active && <span className="text-[10px] text-slate-500 shrink-0">(비활성)</span>}
+                  </div>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editNotes}
+                      onChange={e => setEditNotes(e.target.value)}
+                      placeholder="메모"
+                      className="mt-1 w-full px-2 py-1 rounded text-xs bg-dark-bg border border-dark-border text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  ) : (
+                    p.notes && <p className="text-xs text-slate-500 mt-0.5 truncate">{p.notes}</p>
+                  )}
+                </div>
+
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={() => saveEdit(p)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                    >
+                      <Check size={11} /> 저장
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="text-xs px-2 py-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startEdit(p)}
+                      className="p-1.5 rounded-md text-slate-500 hover:text-primary-400 hover:bg-primary-500/10 transition-colors"
+                      title="할인율 수정"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={() => toggleActive(p)}
+                      className="text-xs px-2 py-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                    >
+                      {p.active ? '비활성화' : '활성화'}
+                    </button>
+                    <button
+                      onClick={() => remove(p)}
+                      className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )

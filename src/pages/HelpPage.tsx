@@ -6,6 +6,7 @@ import {
   PlusCircle, FolderOpen, Repeat, Truck, Package,
   Building2, Key, RefreshCw, Zap, Store, Database,
 } from 'lucide-react'
+import { CoupangOpenapiGuide } from '../components/CoupangOpenapiGuide'
 
 // ─── 공통 컴포넌트 ─────────────────────────────────────────────────────────────
 
@@ -611,10 +612,8 @@ function BusinessSection() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 space-y-1.5">
-          <p className="text-xs font-semibold text-amber-400">쿠팡 API 키 발급 안내</p>
-          <p className="text-xs text-slate-400">쿠팡 Wing → 판매자 정보 → Open API 신청에서 액세스 키와 시크릿 키를 발급받으세요.</p>
-          <p className="text-xs text-slate-400">승인까지 보통 1영업일 소요됩니다. 승인 후 연결 테스트가 성공하면 자동매칭 탭에서 "사용가능"으로 표시됩니다.</p>
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-4">
+          <CoupangOpenapiGuide />
         </div>
 
       </div>

@@ -9,6 +9,7 @@ import { useBusinessStore, type MarketplaceConnection } from '../stores/business
 import { AddBusinessModal } from '../components/businesses/AddBusinessModal'
 import { AddConnectionModal } from '../components/businesses/AddConnectionModal'
 import { MarketplaceBadge } from '../components/businesses/MarketplaceBadge'
+import { CoupangOpenapiGuide } from '../components/CoupangOpenapiGuide'
 import { api } from '../api/client'
 
 type TestStatus = 'idle' | 'testing' | 'ok' | 'fail'
@@ -146,16 +147,21 @@ function SortableConnCard({
       {isOpen && (
         <div className="px-5 pb-5 pt-1 border-t border-primary-500/15 space-y-3 animate-fade-in">
           {conn.marketplace === 'coupang' && (
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">업체코드 (Vendor ID)</label>
-              <input
-                type="text"
-                value={connEdit.vendorId}
-                onChange={e => onEditChange({ vendorId: e.target.value })}
-                placeholder="A00000000"
-                className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
-              />
-            </div>
+            <>
+              <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-3">
+                <CoupangOpenapiGuide />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">업체코드 (Vendor ID)</label>
+                <input
+                  type="text"
+                  value={connEdit.vendorId}
+                  onChange={e => onEditChange({ vendorId: e.target.value })}
+                  placeholder="A00000000"
+                  className="w-full px-3 py-2 rounded-lg text-xs bg-dark-hover border border-dark-border text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
+                />
+              </div>
+            </>
           )}
           <div>
             <label className="block text-xs text-slate-500 mb-1">

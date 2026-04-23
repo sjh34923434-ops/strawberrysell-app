@@ -185,6 +185,114 @@ export const licenseApi = {
       throw new Error(parseError(err))
     }
   },
+
+  listDevices: async () => {
+    try {
+      const { data } = await api.get<{
+        devices: { deviceId: string; label: string | null; createdAt: string; lastSeen: string }[]
+        limit:   number
+        used:    number
+      }>('/license/devices')
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  removeDevice: async (deviceId: string) => {
+    try {
+      const { data } = await api.delete<{ success: boolean }>(`/license/devices/${encodeURIComponent(deviceId)}`)
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+}
+
+// ─── 앱 설정 API (공개/관리자) ────────────────────────────────────────────────
+
+export interface CoupangOpenapiInfo {
+  name: string
+  url:  string
+  ip:   string
+}
+
+export const appSettingsApi = {
+  getCoupangOpenapi: async (): Promise<CoupangOpenapiInfo> => {
+    try {
+      const { data } = await api.get<CoupangOpenapiInfo>('/public/coupang-openapi')
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  updateCoupangOpenapi: async (info: Partial<CoupangOpenapiInfo>) => {
+    try {
+      const { data } = await api.patch<{ success: boolean }>('/admin/coupang-openapi', info)
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+}
+
+// ─── 협력업체 API ─────────────────────────────────────────────────────────────
+
+export interface PartnerCompany {
+  id:               string
+  name:             string
+  discount_percent: number
+  active:           boolean
+  notes:            string | null
+  created_at:       string
+}
+
+export const partnerCompanyApi = {
+  list: async (): Promise<PartnerCompany[]> => {
+    try {
+      const { data } = await api.get<PartnerCompany[]>('/admin/partner-companies')
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  create: async (name: string, discountPercent = 50, notes?: string): Promise<PartnerCompany> => {
+    try {
+      const { data } = await api.post<PartnerCompany>('/admin/partner-companies', { name, discountPercent, notes })
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  update: async (id: string, patch: { active?: boolean; discountPercent?: number; notes?: string }) => {
+    try {
+      const { data } = await api.patch<{ success: boolean }>(`/admin/partner-companies/${id}`, patch)
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  remove: async (id: string) => {
+    try {
+      const { data } = await api.delete<{ success: boolean }>(`/admin/partner-companies/${id}`)
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
+
+  validate: async (name: string): Promise<{ valid: boolean; discountPercent: number | null }> => {
+    try {
+      const { data } = await api.post<{ valid: boolean; discountPercent: number | null }>('/public/validate-partner-company', { name })
+      return data
+    } catch (err) {
+      throw new Error(parseError(err))
+    }
+  },
 }
 
 // ─── 쿠팡 API ─────────────────────────────────────────────────────────────────

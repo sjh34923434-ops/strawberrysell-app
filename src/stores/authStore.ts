@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { authApi } from '../api/client'
+import { authApi, licenseApi } from '../api/client'
 
 interface User {
   id:               string
@@ -100,6 +100,22 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const { user } = await authApi.activate(licenseKey)
+
+      // 현재 기기를 license_devices 에 등록 (다기기 플랜 지원)
+      let deviceId = localStorage.getItem('deviceId')
+      if (!deviceId) {
+        deviceId = crypto.randomUUID()
+        localStorage.setItem('deviceId', deviceId)
+      }
+      try {
+        await licenseApi.activate(licenseKey, deviceId)
+        localStorage.setItem('licenseKey', licenseKey)
+      } catch (deviceErr) {
+        // 기기 한도 초과 등 — 계정 활성화는 성공했으나 기기 등록 실패
+        set({ user, isLoading: false })
+        throw deviceErr
+      }
+
       set({ user, isLoading: false })
     } catch (err) {
       set({

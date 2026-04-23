@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown, Monitor, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
+import { licenseApi } from '../api/client'
 
 function Section({ title, icon: Icon, children, collapsible = false, defaultOpen = true }: {
   title:        string
@@ -232,6 +233,11 @@ export function SettingsPage() {
               </div>
             )}
           </div>
+        </Section>
+
+        {/* 기기 관리 */}
+        <Section title="기기 관리" icon={Monitor} collapsible defaultOpen={false}>
+          <DeviceManagementPanel />
         </Section>
 
         {/* 매칭 설정 */}
@@ -468,6 +474,111 @@ export function SettingsPage() {
         </div>
 
       </div>
+    </div>
+  )
+}
+
+// ─── 기기 관리 패널 ────────────────────────────────────────────────────────────
+
+function DeviceManagementPanel() {
+  const [devices, setDevices] = useState<{ deviceId: string; label: string | null; createdAt: string; lastSeen: string }[]>([])
+  const [limit, setLimit]     = useState<number>(1)
+  const [used, setUsed]       = useState<number>(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  const currentDeviceId = typeof window !== 'undefined' ? localStorage.getItem('deviceId') : null
+
+  async function reload() {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await licenseApi.listDevices()
+      setDevices(data.devices)
+      setLimit(data.limit)
+      setUsed(data.used)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '기기 목록을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { reload() }, [])
+
+  async function handleRemove(deviceId: string) {
+    if (!confirm('이 기기에서 라이선스를 해제할까요? 해당 기기에서는 다시 로그인 후 재등록이 필요합니다.')) return
+    try {
+      await licenseApi.removeDevice(deviceId)
+      await reload()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '기기 해제에 실패했습니다.')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        <Loader2 size={14} className="animate-spin" />
+        불러오는 중...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20">
+        <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+        <p className="text-xs text-red-300">{error}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary-500/10 border border-primary-500/20">
+        <span className="text-sm text-slate-300">등록된 기기</span>
+        <span className="text-sm font-bold text-primary-300">{used} / {limit}대</span>
+      </div>
+
+      {devices.length === 0 ? (
+        <p className="text-sm text-slate-500 px-1">등록된 기기가 없습니다.</p>
+      ) : (
+        <ul className="space-y-2">
+          {devices.map(d => {
+            const isCurrent = d.deviceId === currentDeviceId
+            return (
+              <li key={d.deviceId} className="flex items-center gap-3 px-3 py-3 rounded-xl bg-dark-hover dark:bg-dark-hover bg-gray-50">
+                <Monitor size={16} className={isCurrent ? 'text-primary-400' : 'text-slate-500'} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-slate-200 dark:text-slate-200 text-gray-800 truncate">
+                      {d.label ?? d.deviceId.slice(0, 12) + '...'}
+                    </p>
+                    {isCurrent && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300 font-semibold">현재 기기</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    등록 {new Date(d.createdAt).toLocaleDateString('ko-KR')} · 최근 접속 {new Date(d.lastSeen).toLocaleDateString('ko-KR')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleRemove(d.deviceId)}
+                  className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="기기 해제"
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <p className="text-xs text-slate-500 px-1">
+        플랜별 기기 한도: 1:1 주문매칭 1대 · 일괄매칭 2대 · 자동매칭 3대
+      </p>
     </div>
   )
 }
