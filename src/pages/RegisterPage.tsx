@@ -60,7 +60,8 @@ export function RegisterPage() {
   const [password,  setPassword]  = useState('')
   const [password2, setPassword2] = useState('')
   const [showPw,    setShowPw]    = useState(false)
-  const [agreed,    setAgreed]    = useState(false)
+  const [agreedTerms,   setAgreedTerms]   = useState(false)
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error,     setError]     = useState<string | null>(null)
@@ -70,7 +71,11 @@ export function RegisterPage() {
     e.preventDefault()
     setError(null)
 
-    if (!agreed) {
+    if (!agreedTerms) {
+      setError('이용약관에 동의해주세요.')
+      return
+    }
+    if (!agreedPrivacy) {
       setError('개인정보처리방침에 동의해주세요.')
       return
     }
@@ -214,25 +219,62 @@ export function RegisterPage() {
                   />
                 </div>
 
-                {/* 개인정보처리방침 동의 */}
-                <label className="flex items-start gap-2.5 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={agreed}
-                    onChange={e => setAgreed(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded accent-primary-500 cursor-pointer"
-                  />
-                  <span className="text-xs text-slate-400 leading-relaxed">
-                    <button
-                      type="button"
-                      onClick={() => setShowPrivacy(true)}
-                      className="text-primary-400 hover:text-primary-300 underline transition-colors"
-                    >
-                      개인정보처리방침
-                    </button>
-                    에 동의합니다 <span className="text-primary-400">*</span>
-                  </span>
-                </label>
+                {/* 약관·방침 동의 */}
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-start gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={agreedTerms && agreedPrivacy}
+                      onChange={e => {
+                        setAgreedTerms(e.target.checked)
+                        setAgreedPrivacy(e.target.checked)
+                      }}
+                      className="mt-0.5 w-4 h-4 rounded accent-primary-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-300 font-semibold leading-relaxed">
+                      전체 동의 <span className="text-slate-500 font-normal">(아래 필수 항목 일괄 동의)</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer group ml-6">
+                    <input
+                      type="checkbox"
+                      checked={agreedTerms}
+                      onChange={e => setAgreedTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded accent-primary-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-400 leading-relaxed">
+                      <a
+                        href="https://strawberrysell.com/terms.html"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary-400 hover:text-primary-300 underline transition-colors"
+                      >
+                        이용약관
+                      </a>
+                      에 동의합니다 <span className="text-primary-400">*</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer group ml-6">
+                    <input
+                      type="checkbox"
+                      checked={agreedPrivacy}
+                      onChange={e => setAgreedPrivacy(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded accent-primary-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-400 leading-relaxed">
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacy(true)}
+                        className="text-primary-400 hover:text-primary-300 underline transition-colors"
+                      >
+                        개인정보처리방침
+                      </button>
+                      에 동의합니다 <span className="text-primary-400">*</span>
+                    </span>
+                  </label>
+                </div>
 
                 <button
                   type="submit"

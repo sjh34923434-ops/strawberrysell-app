@@ -430,8 +430,8 @@ export function CoupangAutoPage() {
                       <div className="text-center">
                         <p className={`text-base font-bold ${color}`}>{type}</p>
                         <p className="text-xs text-slate-500 mt-0.5">API 자동 주문 수집</p>
-                        <p className={`text-xs font-semibold mt-1.5 ${['쿠팡', '스마트스토어'].includes(type) ? 'text-emerald-400' : 'text-slate-500'}`}>
-                          {['쿠팡', '스마트스토어'].includes(type) ? '사용가능' : '준비중'}
+                        <p className={`text-xs font-semibold mt-1.5 ${type === '쿠팡' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {type === '쿠팡' ? '사용가능' : '준비중'}
                         </p>
                       </div>
                     </button>

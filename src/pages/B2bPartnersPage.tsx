@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Database, Plus, Pencil, Trash2, Tag, X,
   CheckCircle2, FileSpreadsheet, AlertCircle, Store, Truck, Zap,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useSettingsStore, type CoupangPartner, type MarketTemplate, type SupplierMappingPreset, type MarketType, MARKET_TYPES } from '../stores/settingsStore'
 import { FileUploader } from '../components/FileUploader'
@@ -396,6 +397,15 @@ export function B2bPartnersPage() {
           )}
         </div>
 
+        {/* 쿠팡 안내 배너 */}
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-500/8 border border-emerald-500/25">
+          <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+          <p className="text-xs text-emerald-200/90 leading-relaxed">
+            <span className="font-semibold">쿠팡만 사용</span>하시면 <span className="font-semibold text-emerald-100">B2B 주문 양식</span>만 등록하면 끝!
+            <span className="text-emerald-300/70"> · 송장 매칭 프리셋·마켓 송장등록 양식은 표준 파일이면 자동 인식</span>
+          </p>
+        </div>
+
         {/* 탭 */}
         <div className="flex gap-1 p-1 rounded-xl bg-dark-hover border border-dark-border">
           <button
@@ -508,11 +518,16 @@ export function B2bPartnersPage() {
         {/* ── supplier 탭 폼 ── */}
         {tab === 'supplier' && sFormOpen && (
           <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <p className="text-base font-semibold text-slate-200">
-                {sEditingId ? '프리셋 수정' : '송장 매칭 프리셋 추가'}
-              </p>
-              <button onClick={closeSupplierForm} className="text-slate-500 hover:text-slate-300 transition-colors">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="text-base font-semibold text-slate-200">
+                  {sEditingId ? '프리셋 수정' : '송장 매칭 프리셋 추가'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  B2B 거래처에서 송장번호가 포함되어 내려받은 엑셀의 컬럼 매핑을 저장합니다
+                </p>
+              </div>
+              <button onClick={closeSupplierForm} className="text-slate-500 hover:text-slate-300 transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
@@ -821,7 +836,84 @@ export function B2bPartnersPage() {
           </div>
         )}
 
+        {/* 3가지 양식 차이 안내 (항상 하단 표시) */}
+        <FormatGuideBanner />
+
       </div>
+    </div>
+  )
+}
+
+// ─── 3가지 양식 차이 안내 배너 ────────────────────────────────────────────────
+
+function FormatGuideBanner() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-2xl border border-dark-border bg-dark-card/40 overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-dark-hover/40 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">💡</span>
+          <span className="text-sm font-semibold text-slate-200">3가지 양식 차이 — 헷갈리시면 클릭</span>
+        </div>
+        {open
+          ? <ChevronUp size={16} className="text-slate-500" />
+          : <ChevronDown size={16} className="text-slate-500" />}
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 pt-1 space-y-4 animate-fade-in border-t border-dark-border">
+
+          <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-4 py-3 text-xs text-emerald-300/90">
+            ✓ 쿠팡만 사용하시면 <span className="font-semibold">마켓 송장등록 양식 등록 불필요</span> (API 자동 전송)
+          </div>
+
+          {/* 비교 표 */}
+          <div className="rounded-xl border border-dark-border overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-dark-hover">
+                <tr>
+                  <th className="text-left px-3 py-2 text-slate-400 font-medium">양식</th>
+                  <th className="text-left px-3 py-2 text-slate-400 font-medium">방향</th>
+                  <th className="text-left px-3 py-2 text-slate-400 font-medium">용도</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-border">
+                <tr>
+                  <td className="px-3 py-2.5 text-primary-400 font-semibold">B2B 주문 양식</td>
+                  <td className="px-3 py-2.5 text-slate-400">출력</td>
+                  <td className="px-3 py-2.5 text-slate-300">거래처(도매처)에 보낼 발주서 양식</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2.5 text-amber-400 font-semibold">송장 매칭 프리셋</td>
+                  <td className="px-3 py-2.5 text-slate-400">입력</td>
+                  <td className="px-3 py-2.5 text-slate-300">거래처에서 받은 엑셀에서 송장번호 추출</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2.5 text-amber-400 font-semibold">마켓 송장등록 양식</td>
+                  <td className="px-3 py-2.5 text-slate-400">출력</td>
+                  <td className="px-3 py-2.5 text-slate-300">마켓에 업로드할 양식으로 변환</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* 운송장 흐름 다이어그램 */}
+          <div className="rounded-xl bg-dark-hover/40 border border-dark-border p-4 space-y-2 text-xs text-slate-300 leading-relaxed">
+            <p className="font-semibold text-slate-200 mb-1.5">📦 운송장 매칭 흐름</p>
+            <p>① 거래처가 송장번호 들어간 엑셀을 보냄</p>
+            <p className="pl-3 text-amber-400/80">↓ <span className="font-semibold">송장 매칭 프리셋</span>이 컬럼 자동 인식 → 송장번호 추출</p>
+            <p>② 원 주문과 송장번호 매칭</p>
+            <p className="pl-3 text-slate-500">↓</p>
+            <p>③ 결과 출력</p>
+            <p className="pl-3 text-emerald-400/80">├─ 쿠팡: API로 자동 전송 (양식 불필요)</p>
+            <p className="pl-3 text-amber-400/80">└─ 까다로운 마켓: <span className="font-semibold">마켓 송장등록 양식</span> 형식으로 엑셀 다운로드</p>
+          </div>
+
+        </div>
+      )}
     </div>
   )
 }

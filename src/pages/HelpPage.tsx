@@ -731,6 +731,92 @@ function TextGuideSection() {
   )
 }
 
+// ─── 섹션 9: 플랜·라이선스·기기 ───────────────────────────────────────────────
+
+function PlanLicenseSection() {
+  const plans = [
+    {
+      name: '1:1 주문매칭', price: '월 10,000원',
+      tier: 'single', devices: 1,
+      color: 'border-slate-700 bg-slate-800/40',
+      badge: 'text-slate-300 bg-slate-700/40',
+      desc: '주문 엑셀 ↔ B2B 양식 수동 매칭 (가입 후 30일 무료 체험)',
+    },
+    {
+      name: '일괄매칭', price: '월 24,500원',
+      tier: 'bulk', devices: 2,
+      color: 'border-slate-700 bg-slate-800/40',
+      badge: 'text-slate-300 bg-slate-700/40',
+      desc: '여러 거래처 섞인 주문 파일 한 번에 분류·처리 (+ 1:1 주문매칭 포함)',
+    },
+    {
+      name: '자동매칭', price: '월 30,000원',
+      tier: 'auto', devices: 3,
+      color: 'border-primary-500/30 bg-primary-500/5',
+      badge: 'text-primary-300 bg-primary-500/15',
+      desc: '쿠팡 API 자동 수집·송장 자동 전송 (+ 일괄매칭·1:1 주문매칭 포함)',
+    },
+  ]
+
+  return (
+    <SectionWrap title="💳 플랜·라이선스·기기 관리">
+      <div className="mt-5 space-y-4">
+
+        <p className="text-xs text-slate-400">
+          상위 플랜을 구매하면 하위 플랜 기능이 모두 포함됩니다. 표시 가격은 부가세 별도(VAT 10%)이며,
+          결제 시 실결제 금액은 1:1 11,000원 / 일괄 26,950원 / 자동 33,000원입니다.
+        </p>
+
+        {/* 플랜 카드 3개 */}
+        <div className="space-y-2">
+          {plans.map(p => (
+            <div key={p.name} className={`px-4 py-3 rounded-xl border ${p.color}`}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-slate-200">{p.name}</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] px-2 py-0.5 rounded-md font-semibold ${p.badge}`}>최대 {p.devices}대 PC</span>
+                  <span className="text-sm font-bold text-primary-300">{p.price}</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">{p.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* 무료 체험 안내 */}
+        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-emerald-400">무료 체험</p>
+          <p className="text-xs text-slate-400">• <span className="text-emerald-300 font-semibold">가입 시 7일</span> — 자동매칭·일괄매칭·1:1 주문매칭 전체 기능 체험</p>
+          <p className="text-xs text-slate-400">• <span className="text-emerald-300 font-semibold">7일 종료 후 30일 추가 무료</span> — 1:1 주문매칭만 (자동·일괄은 결제 필요)</p>
+          <p className="text-xs text-slate-400">• 베타 기간(~2026-05-20)은 모든 사용자가 전체 기능 무료</p>
+        </div>
+
+        {/* 다기기 안내 */}
+        <div className="rounded-xl bg-primary-500/5 border border-primary-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-primary-400">다기기 사용 (집·회사·이동용)</p>
+          <p className="text-xs text-slate-400">플랜별로 동시에 등록 가능한 PC 수가 다릅니다. 등록·해제는 <span className="text-primary-300 font-semibold">설정 → 기기 관리</span>에서 가능합니다.</p>
+          <p className="text-xs text-slate-500 mt-1">📱 모바일(스마트폰) 앱은 지원하지 않습니다 — Windows 데스크탑 전용</p>
+        </div>
+
+        {/* 협력업체 할인 */}
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-amber-400">🤝 협력업체 할인</p>
+          <p className="text-xs text-slate-400">협력업체와 함께하시는 셀러는 <span className="text-amber-300 font-semibold">최대 30% 할인</span>이 적용됩니다.</p>
+          <p className="text-xs text-slate-500">자세한 내용은 고객센터(support@strawberrysell.com)로 문의해주세요.</p>
+        </div>
+
+        {/* 환불 정책 */}
+        <div className="rounded-xl bg-dark-hover/40 border border-dark-border px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-slate-300">환불 정책</p>
+          <p className="text-xs text-slate-500">• 결제 후 7일 이내, 누적 사용 10회 미만이면 100% 환불</p>
+          <p className="text-xs text-slate-500">• 무료 체험·증정 라이선스는 환불 대상 아님</p>
+        </div>
+
+      </div>
+    </SectionWrap>
+  )
+}
+
 // ─── 메인 ──────────────────────────────────────────────────────────────────────
 
 export function HelpPage() {
@@ -754,6 +840,23 @@ export function HelpPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+            <span className="text-emerald-400 text-sm shrink-0">🎁</span>
+            <div>
+              <p className="text-xs font-semibold text-emerald-300">7일 전체 + 30일 1:1 무료 체험</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">가입 후 7일은 모든 기능, 이후 30일은 1:1 주문매칭 무료</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-primary-500/5 border border-primary-500/20">
+            <span className="text-primary-400 text-sm shrink-0">💻</span>
+            <div>
+              <p className="text-xs font-semibold text-primary-300">최대 3대 PC 사용 (자동매칭)</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">집·회사·이동용 PC 등록 — 설정 &gt; 기기 관리</p>
+            </div>
+          </div>
+        </div>
+
         <FullFlowSection />
         <B2bSection />
         <BusinessSection />
@@ -762,6 +865,7 @@ export function HelpPage() {
         <MultiMatchFlowSection />
         <InvoiceSection />
         <SaveLoadSection />
+        <PlanLicenseSection />
         <TextGuideSection />
 
         <p className="text-xs text-slate-600 text-center pb-4">기능이 추가될 때마다 매뉴얼도 업데이트됩니다.</p>
