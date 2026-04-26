@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 // 렌더러(React) 전용 Vite 설정
 export default defineConfig({
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {

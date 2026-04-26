@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electron', {
   system: {
     getMacAddress:   () => ipcRenderer.invoke('get-mac-address'),
     getAppVersion:   () => ipcRenderer.invoke('get-app-version'),
+    getUpdateInfo:   () => ipcRenderer.invoke('get-update-info'),
     getPresetSeed:   () => ipcRenderer.invoke('get-preset-seed'),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
   },

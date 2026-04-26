@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown, Monitor, X } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown, Monitor, X, Download, Upload, Database } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
@@ -48,6 +48,71 @@ export function SettingsPage() {
   const [activateSuccess, setActivateSuccess] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<'idle' | 'loading' | 'success' | 'none' | 'error'>('idle')
   const [userDataPath, setUserDataPath] = useState<string | null>(null)
+  const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const handleExportBackup = () => {
+    const state = useSettingsStore.getState()
+    const payload = {
+      version:    1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        coupangPartners:        state.coupangPartners,
+        marketTemplates:        state.marketTemplates,
+        supplierMappingPresets: state.supplierMappingPresets,
+        multiMatchConfigs:      state.multiMatchConfigs,
+      },
+    }
+    const blob  = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url   = URL.createObjectURL(blob)
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const a     = document.createElement('a')
+    a.href      = url
+    a.download  = `딸기셀_거래처백업_${stamp}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setBackupMessage({ type: 'success', text: '백업 파일을 다운로드했습니다.' })
+    setTimeout(() => setBackupMessage(null), 3000)
+  }
+
+  const handleImportBackup = () => {
+    const input  = document.createElement('input')
+    input.type   = 'file'
+    input.accept = '.json,application/json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const parsed = JSON.parse(await file.text())
+        const data   = parsed?.data
+        if (!data || !Array.isArray(data.coupangPartners)) {
+          setBackupMessage({ type: 'error', text: '잘못된 백업 파일입니다.' })
+          return
+        }
+        const partnerCount  = data.coupangPartners.length
+        const templateCount = data.marketTemplates?.length        ?? 0
+        const presetCount   = data.supplierMappingPresets?.length ?? 0
+        const ok = window.confirm(
+          `다음 데이터를 가져옵니다:\n\n` +
+          `• 거래처 ${partnerCount}개\n` +
+          `• 마켓 양식 ${templateCount}개\n` +
+          `• 송장 매핑 프리셋 ${presetCount}개\n\n` +
+          `기존 데이터는 모두 덮어써집니다. 계속하시겠습니까?`
+        )
+        if (!ok) return
+        useSettingsStore.setState({
+          coupangPartners:        data.coupangPartners,
+          marketTemplates:        data.marketTemplates        ?? [],
+          supplierMappingPresets: data.supplierMappingPresets ?? [],
+          multiMatchConfigs:      data.multiMatchConfigs      ?? [],
+        })
+        setBackupMessage({ type: 'success', text: '가져오기 완료! 거래처 데이터가 복원됐습니다.' })
+        setTimeout(() => setBackupMessage(null), 4000)
+      } catch {
+        setBackupMessage({ type: 'error', text: '파일을 읽는 중 오류가 발생했습니다.' })
+      }
+    }
+    input.click()
+  }
 
   const handleRestorePresets = async () => {
     setRestoreStatus('loading')
@@ -141,9 +206,15 @@ export function SettingsPage() {
           </div>
         </Section>
 
-        {/* 계정 정보 */}
-        <Section title="계정 정보" icon={User} collapsible defaultOpen={false}>
-          <div className="space-y-3 text-sm">
+        {/* 계정 · 라이선스 · 기기 */}
+        <Section title="계정 · 라이선스" icon={User} collapsible defaultOpen={false}>
+          <div className="space-y-6">
+
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <User size={12} /> 계정 정보
+              </h3>
+              <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between py-2 border-b border-dark-border dark:border-dark-border border-gray-100">
               <span className="text-slate-500">이메일</span>
               <span className="text-slate-200 dark:text-slate-200 text-gray-700">{user?.email}</span>
@@ -152,12 +223,14 @@ export function SettingsPage() {
               <span className="text-slate-500">계정 ID</span>
               <span className="text-slate-400 dark:text-slate-400 text-gray-500 font-mono text-xs">{user?.id.slice(0, 8)}…</span>
             </div>
-          </div>
-        </Section>
+              </div>
+            </div>
 
-        {/* 라이선스 */}
-        <Section title="라이선스" icon={Key} collapsible defaultOpen={false}>
-          <div className="space-y-4">
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Key size={12} /> 라이선스
+              </h3>
+              <div className="space-y-4">
             {isActivated && licenseKey ? (
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -233,15 +306,26 @@ export function SettingsPage() {
               </div>
             )}
           </div>
+            </div>
+
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Monitor size={12} /> 기기 관리
+              </h3>
+              <DeviceManagementPanel />
+            </div>
+
+          </div>
         </Section>
 
-        {/* 기기 관리 */}
-        <Section title="기기 관리" icon={Monitor} collapsible defaultOpen={false}>
-          <DeviceManagementPanel />
-        </Section>
+        {/* 매칭 · 내보내기 */}
+        <Section title="매칭 · 내보내기" icon={Shield} collapsible defaultOpen={false}>
+          <div className="space-y-6">
 
-        {/* 매칭 설정 */}
-        <Section title="매칭 기본 설정" icon={Shield} collapsible defaultOpen={false}>
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Shield size={12} /> 매칭 기본 설정
+              </h3>
           <div className="space-y-4">
             {[
               { key: 'trimWhitespace',  label: '앞뒤 공백 무시',  desc: '키 값 비교 시 앞뒤 공백을 자동으로 제거합니다' },
@@ -297,10 +381,12 @@ export function SettingsPage() {
               </p>
             </div>
           </div>
-        </Section>
+            </div>
 
-        {/* 내보내기 파일명 설정 */}
-        <Section title="내보내기 파일명 설정" icon={FileText} collapsible defaultOpen={false}>
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <FileText size={12} /> 내보내기 파일명 설정
+              </h3>
           {(() => {
             const now = new Date()
             const pad = (n: number) => String(n).padStart(2, '0')
@@ -362,10 +448,19 @@ export function SettingsPage() {
               </div>
             )
           })()}
+            </div>
+
+          </div>
         </Section>
 
-        {/* 저장 데이터 관리 */}
-        <Section title="저장 데이터 관리" icon={Trash2} collapsible defaultOpen={false}>
+        {/* 데이터 관리 (저장 데이터 + 백업 + 복원) */}
+        <Section title="데이터 관리" icon={Database} collapsible defaultOpen={false}>
+          <div className="space-y-6">
+
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Trash2 size={12} /> 저장 데이터
+              </h3>
           <div className="space-y-4">
             {/* 저장된 주문 */}
             <div className="flex items-center justify-between py-2 border-b border-dark-border">
@@ -403,10 +498,73 @@ export function SettingsPage() {
               </div>
             </div>
           </div>
-        </Section>
+            </div>
 
-        {/* 데이터 복원 */}
-        <Section title="데이터 복원" icon={RotateCcw} collapsible defaultOpen={false}>
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Database size={12} /> 거래처 백업 · 가져오기
+              </h3>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500">
+              등록한 거래처, 마켓 양식, 송장 매핑 프리셋을 파일로 내보내거나 가져옵니다.
+              <br />
+              <span className="text-xs text-slate-500">다른 PC에서 같은 설정을 사용하려면 내보낸 파일을 복사한 뒤 가져오기 하세요.</span>
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
+              <div className="px-3 py-2 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50">
+                거래처: <span className="text-primary-400 font-semibold">{coupangPartners.length}개</span>
+              </div>
+              <div className="px-3 py-2 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50">
+                송장 프리셋: <span className="text-primary-400 font-semibold">{supplierMappingPresets.length}개</span>
+              </div>
+            </div>
+
+            {backupMessage && (
+              <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border animate-fade-in ${
+                backupMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20'
+                  : 'bg-red-500/10 border-red-500/20'
+              }`}>
+                {backupMessage.type === 'success'
+                  ? <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                  : <AlertCircle  size={14} className="text-red-400     shrink-0 mt-0.5" />}
+                <p className={`text-xs ${backupMessage.type === 'success' ? 'text-emerald-300' : 'text-red-300'}`}>
+                  {backupMessage.text}
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExportBackup}
+                disabled={coupangPartners.length === 0}
+                className="
+                  flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+                  bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white
+                  disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150
+                "
+              >
+                <Download size={14} /> 백업 파일 내보내기
+              </button>
+              <button
+                onClick={handleImportBackup}
+                className="
+                  flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+                  bg-dark-hover hover:bg-slate-700 text-slate-200 border border-dark-border
+                  transition-all duration-150
+                "
+              >
+                <Upload size={14} /> 백업 파일 가져오기
+              </button>
+            </div>
+          </div>
+            </div>
+
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <RotateCcw size={12} /> 데이터 복원
+              </h3>
           <div className="space-y-3">
             <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500">
               컬럼 매핑 프리셋이 사라졌을 때 백업 파일에서 복원합니다.
@@ -459,6 +617,9 @@ export function SettingsPage() {
                 : <><RotateCcw size={14} /> preset-seed.json 에서 복원</>
               }
             </button>
+          </div>
+            </div>
+
           </div>
         </Section>
 

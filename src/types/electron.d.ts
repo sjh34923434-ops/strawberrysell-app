@@ -9,6 +9,7 @@ interface Window {
     system: {
       getMacAddress:  () => Promise<string>
       getAppVersion:  () => Promise<string>
+      getUpdateInfo:  () => Promise<{ version: string; updatedAt: string }>
       getPresetSeed:  () => Promise<string | null>
     }
     updater: {

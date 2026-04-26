@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock } from 'lucide-react'
+import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock, ExternalLink } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { usePlanAccess, type PlanTier } from '../utils/planAccess'
 import { ThemeToggle } from './ThemeToggle'
@@ -73,6 +73,18 @@ export function Sidebar() {
   const navigate = useNavigate()
 
   const [openTip, setOpenTip] = useState<string | null>(null)
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; updatedAt: string } | null>(null)
+
+  useEffect(() => {
+    window.electron?.system.getUpdateInfo?.().then(setUpdateInfo).catch(() => {})
+  }, [])
+
+  const isRecentlyUpdated = updateInfo
+    ? (Date.now() - new Date(updateInfo.updatedAt).getTime()) < 7 * 24 * 60 * 60 * 1000
+    : false
+  const updatedDateLabel = updateInfo
+    ? `${new Date(updateInfo.updatedAt).getMonth() + 1}/${new Date(updateInfo.updatedAt).getDate()}`
+    : ''
 
   const accessMap: Record<string, boolean> = {
     auto:   canUseAuto,
@@ -94,14 +106,26 @@ export function Sidebar() {
     ">
       {/* 로고 */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-dark-border dark:border-dark-border border-gray-200">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500 text-white font-bold text-sm select-none">
-          🍓
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-100 dark:text-slate-100 text-gray-900 leading-none">
-            딸기셀
+        <img src="/icon.svg" alt="딸기셀" className="w-10 h-10 shrink-0 select-none" />
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-sm font-semibold text-slate-100 dark:text-slate-100 text-gray-900 leading-none">
+              딸기셀
+            </p>
+            {updateInfo && (
+              <span className="text-[10px] font-mono text-slate-500 leading-none">v{updateInfo.version}</span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-1 leading-none">
+            주문매칭
+            {isRecentlyUpdated && (
+              <>
+                <span className="text-slate-600 mx-1">·</span>
+                <span className="text-emerald-400/90 font-medium">{updatedDateLabel} 업데이트됨</span>
+              </>
+            )}
+            {!isRecentlyUpdated && ' 시스템'}
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">주문매칭 시스템</p>
         </div>
       </div>
 
@@ -192,6 +216,25 @@ export function Sidebar() {
           </div>
         )})}
       </nav>
+
+      {/* 딸기셀 웹사이트 바로가기 배너 */}
+      <button
+        onClick={() => window.open('https://strawberrysell.com', '_blank')}
+        className="
+          mx-3 mb-3 flex items-center gap-2.5 px-3 py-2.5 rounded-xl
+          border border-primary-500/25 bg-gradient-to-br from-primary-500/10 to-primary-500/5
+          hover:from-primary-500/15 hover:to-primary-500/10 hover:border-primary-500/40
+          transition-all duration-150 group
+        "
+        title="딸기셀 웹사이트 새 창에서 열기"
+      >
+        <img src="/icon.svg" alt="" className="w-7 h-7 shrink-0" />
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-xs font-semibold text-slate-100 leading-none">딸기셀 웹사이트</p>
+          <p className="text-[10px] text-slate-500 mt-1 leading-none truncate">strawberrysell.com</p>
+        </div>
+        <ExternalLink size={12} className="text-slate-500 group-hover:text-primary-400 shrink-0 transition-colors" />
+      </button>
 
       {/* 하단 영역 */}
       <div className="px-3 pb-4 space-y-1 border-t border-dark-border dark:border-dark-border border-gray-200 pt-3">

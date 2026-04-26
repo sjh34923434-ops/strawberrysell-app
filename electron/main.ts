@@ -31,12 +31,17 @@ function getMacAddress(): string {
 // ─── 윈도우 생성 ───────────────────────────────────────────────────────────────
 
 function createWindow(): BrowserWindow {
+  const iconPath = isDev
+    ? join(process.cwd(), 'public', 'icon.png')
+    : join(__dirname, '../dist/icon.png')
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 960,
     minHeight: 620,
     backgroundColor: '#0A0F1E',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -112,6 +117,18 @@ function registerIpcHandlers(): void {
   // 시스템 정보
   ipcMain.handle('get-mac-address', () => getMacAddress())
   ipcMain.handle('get-app-version', () => app.getVersion())
+
+  // 버전 + 업데이트 날짜 (현재 버전 vs 저장된 버전 비교 → 다르면 오늘 날짜 갱신)
+  ipcMain.handle('get-update-info', () => {
+    const currentVersion = app.getVersion()
+    const stored         = (store.get('versionInfo') as { version?: string; updatedAt?: string } | undefined) ?? {}
+    if (stored.version !== currentVersion) {
+      const updatedAt = new Date().toISOString()
+      store.set('versionInfo', { version: currentVersion, updatedAt })
+      return { version: currentVersion, updatedAt }
+    }
+    return { version: currentVersion, updatedAt: stored.updatedAt ?? new Date().toISOString() }
+  })
 
   // userData 경로 반환 (디버그/복원용)
   ipcMain.handle('get-user-data-path', () => app.getPath('userData'))

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck, Ban, ShieldCheck, Loader2, Building2, Pencil } from 'lucide-react'
+import { Key, Users, Plus, Trash2, RefreshCw, Copy, Check, AlertCircle, UserCheck, Ban, ShieldCheck, Loader2, Building2, Pencil, X } from 'lucide-react'
 import { api, appSettingsApi, partnerCompanyApi, type PartnerCompany } from '../api/client'
 
 interface License {
@@ -162,6 +162,9 @@ export function AdminPage() {
         notes:    issueNotes || undefined,
       })
       setNewKeys(data.keys)
+      setLabel('')
+      setIssuedTo('')
+      setIssueNotes('')
       await loadData()
     } catch {
       setError('라이선스 발급에 실패했습니다.')
@@ -408,11 +411,20 @@ export function AdminPage() {
 
             {newKeys.length > 0 && (
               <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                <p className="text-xs text-green-400 font-medium mb-2">발급된 키 ({newKeys.length}개)</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-green-400 font-medium">발급된 키 ({newKeys.length}개)</p>
+                  <button
+                    onClick={() => setNewKeys([])}
+                    title="이 영역 닫기"
+                    className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded hover:bg-slate-700/40 transition-colors"
+                  >
+                    <X size={11} /> 닫기
+                  </button>
+                </div>
                 {newKeys.map((key) => (
                   <div key={key} className="flex items-center gap-2 mt-1">
                     <code className="text-xs text-slate-300 flex-1 font-mono">{key}</code>
-                    <button onClick={() => copyKey(key)} className="text-slate-400 hover:text-slate-200 transition-colors">
+                    <button onClick={() => copyKey(key)} title="복사" className="text-slate-400 hover:text-slate-200 transition-colors">
                       {copied === key ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
                     </button>
                   </div>

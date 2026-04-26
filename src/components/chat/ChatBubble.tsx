@@ -38,17 +38,28 @@ function UserMessage({ text }: { text: string }) {
   )
 }
 
+const WELCOME_MESSAGE: Message = {
+  id:   'welcome',
+  role: 'bot',
+  text: '안녕하세요! 딸기셀 도우미입니다. 🍓\n\n궁금한 점을 물어보세요.\n/ 또는 ? 로 시작해도 됩니다.',
+}
+
 export function ChatBubble() {
   const [open,     setOpen]     = useState(false)
   const [input,    setInput]    = useState('')
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id:   'welcome',
-      role: 'bot',
-      text: '안녕하세요! 딸기셀 도우미입니다. 🍓\n\n궁금한 점을 물어보세요.\n/ 또는 ? 로 시작해도 됩니다.',
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [typing, setTyping] = useState(false)
+
+  const resetChat = () => {
+    setMessages([WELCOME_MESSAGE])
+    setInput('')
+    setTyping(false)
+  }
+
+  const handleToggle = () => {
+    if (!open) resetChat()
+    setOpen(v => !v)
+  }
 
   const bottomRef  = useRef<HTMLDivElement>(null)
   const inputRef   = useRef<HTMLInputElement>(null)
@@ -91,7 +102,7 @@ export function ChatBubble() {
     <>
       {/* ── 말풍선 버튼 ── */}
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={handleToggle}
         className={`fixed bottom-6 right-6 z-50 shadow-xl flex items-center justify-center gap-2 transition-all duration-300
           ${open
             ? 'w-10 h-10 rounded-full bg-dark-card border border-dark-border text-slate-400 hover:text-slate-200 scale-95'

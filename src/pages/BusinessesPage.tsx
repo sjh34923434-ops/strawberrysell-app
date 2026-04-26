@@ -211,6 +211,16 @@ function SortableConnCard({
   )
 }
 
+// 사업자 탭 색상 팔레트 — 사업자별로 인덱스 순환 적용
+const BIZ_TAB_COLORS = [
+  { activeBg: 'bg-primary-500/15', activeBorder: 'border-primary-500/40', activeText: 'text-primary-200', hoverText: 'hover:text-primary-300', dot: 'bg-primary-400', badge: 'bg-primary-500/25 text-primary-200' },
+  { activeBg: 'bg-amber-500/15',   activeBorder: 'border-amber-500/40',   activeText: 'text-amber-200',   hoverText: 'hover:text-amber-300',   dot: 'bg-amber-400',   badge: 'bg-amber-500/25 text-amber-200' },
+  { activeBg: 'bg-emerald-500/15', activeBorder: 'border-emerald-500/40', activeText: 'text-emerald-200', hoverText: 'hover:text-emerald-300', dot: 'bg-emerald-400', badge: 'bg-emerald-500/25 text-emerald-200' },
+  { activeBg: 'bg-sky-500/15',     activeBorder: 'border-sky-500/40',     activeText: 'text-sky-200',     hoverText: 'hover:text-sky-300',     dot: 'bg-sky-400',     badge: 'bg-sky-500/25 text-sky-200' },
+  { activeBg: 'bg-fuchsia-500/15', activeBorder: 'border-fuchsia-500/40', activeText: 'text-fuchsia-200', hoverText: 'hover:text-fuchsia-300', dot: 'bg-fuchsia-400', badge: 'bg-fuchsia-500/25 text-fuchsia-200' },
+  { activeBg: 'bg-rose-500/15',    activeBorder: 'border-rose-500/40',    activeText: 'text-rose-200',    hoverText: 'hover:text-rose-300',    dot: 'bg-rose-400',    badge: 'bg-rose-500/25 text-rose-200' },
+]
+
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export function BusinessesPage() {
   const { businesses, isLoading, error, fetch, update, remove, removeConnection, testConnection } = useBusinessStore()
@@ -406,27 +416,32 @@ export function BusinessesPage() {
           </div>
         ) : (
           <>
-            {businesses.map(biz => (
-              <button
-                key={biz.id}
-                onClick={() => setActiveId(biz.id)}
-                className={`
-                  relative flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-medium
-                  border border-b-0 transition-all duration-150 min-w-[100px] max-w-[160px]
-                  ${activeId === biz.id
-                    ? 'bg-dark-card dark:bg-dark-card bg-white border-dark-border dark:border-dark-border border-gray-200 text-slate-100 shadow-sm -mb-px z-10'
-                    : 'bg-dark-hover/40 border-transparent text-slate-500 hover:text-slate-300 hover:bg-dark-hover/70'}
-                `}
-              >
-                <span className="truncate">{biz.name}</span>
-                {biz.connections.length > 0 && (
-                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium
-                    ${activeId === biz.id ? 'bg-primary-500/20 text-primary-400' : 'bg-slate-700 text-slate-400'}`}>
-                    {biz.connections.length}
-                  </span>
-                )}
-              </button>
-            ))}
+            {businesses.map((biz, idx) => {
+              const c = BIZ_TAB_COLORS[idx % BIZ_TAB_COLORS.length]
+              const active = activeId === biz.id
+              return (
+                <button
+                  key={biz.id}
+                  onClick={() => setActiveId(biz.id)}
+                  className={`
+                    relative flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-medium
+                    border border-b-0 transition-all duration-150 min-w-[100px] max-w-[160px]
+                    ${active
+                      ? `${c.activeBg} ${c.activeBorder} ${c.activeText} shadow-sm -mb-px z-10`
+                      : `bg-dark-hover/40 border-transparent text-slate-500 ${c.hoverText} hover:bg-dark-hover/70`}
+                  `}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+                  <span className="truncate">{biz.name}</span>
+                  {biz.connections.length > 0 && (
+                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium
+                      ${active ? c.badge : 'bg-slate-700 text-slate-400'}`}>
+                      {biz.connections.length}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
 
             {/* + 사업자 추가 탭 */}
             <button

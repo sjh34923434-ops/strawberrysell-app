@@ -583,6 +583,113 @@ function SaveLoadSection() {
   )
 }
 
+// ─── 섹션 6.5: 다른 PC로 거래처 옮기기 ────────────────────────────────────────
+
+function MultiPcBackupSection() {
+  return (
+    <SectionWrap title="💻 다른 PC로 거래처 옮기기 (백업·복원)">
+      <div className="mt-5 space-y-4">
+
+        <div className="rounded-xl bg-primary-500/5 border border-primary-500/20 px-4 py-3">
+          <p className="text-xs text-primary-300 font-semibold mb-1">⚡ 언제 사용하나요?</p>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            자동매칭 플랜은 최대 3대 PC에서 동시 사용 가능합니다.
+            한 PC에서 등록한 <span className="text-primary-300 font-semibold">거래처·마켓 양식·송장 매핑 프리셋</span>은 자동 동기화되지 않으므로,
+            아래 방법으로 파일을 옮겨주세요.
+          </p>
+        </div>
+
+        {/* A. 내보내기 */}
+        <div>
+          <p className="text-xs font-semibold text-emerald-400 mb-2">A. 기존 PC에서 백업 파일 만들기</p>
+          <ol className="space-y-2">
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center justify-center">1</span>
+              <p className="text-xs text-slate-300 leading-relaxed">왼쪽 사이드바 <span className="font-semibold text-slate-200">설정</span>으로 이동</p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center justify-center">2</span>
+              <p className="text-xs text-slate-300 leading-relaxed"><span className="font-semibold text-slate-200">"거래처 백업 · 가져오기"</span> 항목 펼치기</p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center justify-center">3</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300 font-semibold"><Download size={10} /> 백업 파일 내보내기</span> 클릭
+              </p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center justify-center">4</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <span className="font-mono text-[11px] text-amber-300">딸기셀_거래처백업_YYYYMMDD.json</span> 파일이 다운로드 폴더에 저장됨
+              </p>
+            </li>
+          </ol>
+        </div>
+
+        {/* B. 파일 옮기기 */}
+        <div>
+          <p className="text-xs font-semibold text-amber-400 mb-2">B. 새 PC로 파일 옮기기</p>
+          <p className="text-xs text-slate-400 leading-relaxed mb-2">아래 중 편한 방법 하나를 선택하세요:</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="px-3 py-2.5 rounded-lg bg-dark-hover/50 border border-dark-border">
+              <p className="text-xs font-semibold text-slate-300 mb-0.5">📧 이메일</p>
+              <p className="text-[11px] text-slate-500">자기 자신에게 첨부 메일 발송</p>
+            </div>
+            <div className="px-3 py-2.5 rounded-lg bg-dark-hover/50 border border-dark-border">
+              <p className="text-xs font-semibold text-slate-300 mb-0.5">💬 카톡</p>
+              <p className="text-[11px] text-slate-500">"나에게 보내기" 채팅에 첨부</p>
+            </div>
+            <div className="px-3 py-2.5 rounded-lg bg-dark-hover/50 border border-dark-border">
+              <p className="text-xs font-semibold text-slate-300 mb-0.5">💾 USB</p>
+              <p className="text-[11px] text-slate-500">파일 복사 후 옮기기</p>
+            </div>
+          </div>
+        </div>
+
+        {/* C. 가져오기 */}
+        <div>
+          <p className="text-xs font-semibold text-sky-400 mb-2">C. 새 PC에서 백업 파일 불러오기</p>
+          <ol className="space-y-2">
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold flex items-center justify-center">1</span>
+              <p className="text-xs text-slate-300 leading-relaxed">새 PC에서 딸기셀 설치 후 로그인 → <span className="font-semibold text-slate-200">설정</span>으로 이동</p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold flex items-center justify-center">2</span>
+              <p className="text-xs text-slate-300 leading-relaxed"><span className="font-semibold text-slate-200">"거래처 백업 · 가져오기"</span> 항목 펼치기</p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold flex items-center justify-center">3</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-semibold"><Upload size={10} /> 백업 파일 가져오기</span> 클릭 → 옮긴 .json 파일 선택
+              </p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold flex items-center justify-center">4</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                항목 개수(거래처 N개·양식 N개·프리셋 N개) 확인 후 <span className="font-semibold text-emerald-300">"확인"</span> 클릭
+              </p>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold flex items-center justify-center">5</span>
+              <p className="text-xs text-slate-300 leading-relaxed">완료! 거래처 관리 화면에서 동일한 데이터 확인 가능</p>
+            </li>
+          </ol>
+        </div>
+
+        {/* 주의사항 */}
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-amber-400">⚠️ 주의사항</p>
+          <p className="text-[11px] text-slate-400 leading-relaxed">• 가져오기 시 <span className="text-amber-300">기존 거래처 데이터는 모두 덮어쓰기</span>됩니다. 새 PC에서 이미 등록한 거래처가 있으면 사라지니 주의하세요.</p>
+          <p className="text-[11px] text-slate-400 leading-relaxed">• 백업 파일에는 <span className="text-amber-300">거래처·마켓 양식·송장 매핑 프리셋</span>만 포함됩니다. 저장된 주문 데이터는 PC별로 따로 관리됩니다.</p>
+          <p className="text-[11px] text-slate-400 leading-relaxed">• 거래처를 자주 수정하는 경우 정기적으로 백업 파일을 다시 만들어두세요.</p>
+        </div>
+
+      </div>
+    </SectionWrap>
+  )
+}
+
 // ─── 섹션 7: 사업자 관리 ──────────────────────────────────────────────────────
 
 function BusinessSection() {
@@ -865,6 +972,7 @@ export function HelpPage() {
         <MultiMatchFlowSection />
         <InvoiceSection />
         <SaveLoadSection />
+        <MultiPcBackupSection />
         <PlanLicenseSection />
         <TextGuideSection />
 

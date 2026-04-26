@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Database, Plus, Pencil, Trash2, Tag, X,
   CheckCircle2, FileSpreadsheet, AlertCircle, Store, Truck, Zap,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Monitor, ArrowLeft,
 } from 'lucide-react'
 import { useSettingsStore, type CoupangPartner, type MarketTemplate, type SupplierMappingPreset, type MarketType, MARKET_TYPES } from '../stores/settingsStore'
 import { FileUploader } from '../components/FileUploader'
@@ -148,6 +148,13 @@ export function B2bPartnersPage() {
   const [sFormOpen,  setSFormOpen]  = useState(false)
   const [sEditingId, setSEditingId] = useState<string | null>(null)
   const [sForm,      setSForm]      = useState<SupplierForm>(emptySupplierForm())
+
+  // 송장 매칭 프리셋은 고급 기능 — 기존 프리셋이 있거나 사용자가 명시적으로 펼쳤을 때만 노출
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const showSupplierTab = showAdvanced || supplierMappingPresets.length > 0
+  useEffect(() => {
+    if (tab === 'supplier' && !showSupplierTab) setTab('b2b')
+  }, [tab, showSupplierTab])
 
   const isB2b = tab === 'b2b'
 
@@ -406,33 +413,77 @@ export function B2bPartnersPage() {
           </p>
         </div>
 
+        {/* 다중 PC 사용 안내 */}
+        <div className="flex items-start gap-2.5 px-4 py-2.5 rounded-xl bg-primary-500/8 border border-primary-500/25">
+          <Monitor size={14} className="text-primary-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-primary-200/90 leading-relaxed">
+            <span className="font-semibold">2대 이상의 PC에서 사용하시나요?</span>
+            <span className="text-primary-300/80"> 등록한 거래처는 PC별로 따로 저장되니, </span>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="font-semibold text-primary-100 underline underline-offset-2 hover:text-white transition-colors"
+            >
+              설정 → 거래처 백업·가져오기
+            </button>
+            <span className="text-primary-300/80">에서 .json 파일로 옮길 수 있습니다. </span>
+            <button
+              type="button"
+              onClick={() => navigate('/help')}
+              className="text-primary-100 underline underline-offset-2 hover:text-white transition-colors"
+            >
+              자세한 방법 보기 →
+            </button>
+          </p>
+        </div>
+
         {/* 탭 */}
         <div className="flex gap-1 p-1 rounded-xl bg-dark-hover border border-dark-border">
           <button
             onClick={() => { setTab('b2b'); closeForm() }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${tab === 'b2b' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border
+              ${tab === 'b2b'
+                ? 'bg-primary-500/15 border-primary-500/40 text-primary-300 shadow-sm shadow-primary-500/10'
+                : 'border-transparent text-slate-500 hover:text-primary-300 hover:bg-primary-500/5'}`}
           >
             <FileSpreadsheet size={15} /> B2B 주문 양식
           </button>
           <button
-            onClick={() => { setTab('supplier'); closeForm() }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${tab === 'supplier' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Truck size={15} /> 송장 매칭 프리셋
-            {supplierMappingPresets.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">{supplierMappingPresets.length}</span>
-            )}
-          </button>
-          <button
             onClick={() => { setTab('invoice'); closeForm() }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${tab === 'invoice' ? 'bg-dark-card text-slate-100 shadow' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border
+              ${tab === 'invoice'
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm shadow-amber-500/10'
+                : 'border-transparent text-slate-500 hover:text-amber-300 hover:bg-amber-500/5'}`}
           >
             <Store size={15} /> 마켓 송장등록 양식
           </button>
+          {showSupplierTab && (
+            <button
+              onClick={() => { setTab('supplier'); closeForm() }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border
+                ${tab === 'supplier'
+                  ? 'bg-sky-500/15 border-sky-500/40 text-sky-300 shadow-sm shadow-sky-500/10'
+                  : 'border-transparent text-slate-500 hover:text-sky-300 hover:bg-sky-500/5'}`}
+            >
+              <Truck size={15} /> 송장 매칭 프리셋
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300">고급</span>
+              {supplierMappingPresets.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-600/40 text-slate-300">{supplierMappingPresets.length}</span>
+              )}
+            </button>
+          )}
         </div>
+
+        {/* 고급 기능 토글 — 프리셋 없는 사용자에게만 노출 */}
+        {!showSupplierTab && (
+          <button
+            onClick={() => { setShowAdvanced(true); setTab('supplier') }}
+            className="flex items-center gap-1.5 mx-auto text-[11px] text-slate-500 hover:text-amber-400 transition-colors"
+          >
+            <Truck size={11} /> 고급: 송장 매칭 프리셋 표시
+            <span className="text-slate-600">— 거래처 송장 파일 컬럼명이 특이할 때만 사용</span>
+          </button>
+        )}
 
         {/* 탭 설명 */}
         {!formOpen && !sFormOpen && (
@@ -838,6 +889,16 @@ export function B2bPartnersPage() {
 
         {/* 3가지 양식 차이 안내 (항상 하단 표시) */}
         <FormatGuideBanner />
+
+        {/* 대시보드로 돌아가기 */}
+        <div className="flex justify-center pt-4 pb-2">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-dark-hover hover:bg-slate-700 text-slate-300 border border-dark-border transition-all"
+          >
+            <ArrowLeft size={14} /> 대시보드로 돌아가기
+          </button>
+        </div>
 
       </div>
     </div>
