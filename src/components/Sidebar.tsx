@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock, ExternalLink } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { useUpdateStore } from '../stores/updateStore'
 import { usePlanAccess, type PlanTier } from '../utils/planAccess'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -74,17 +75,31 @@ export function Sidebar() {
 
   const [openTip, setOpenTip] = useState<string | null>(null)
   const [updateInfo, setUpdateInfo] = useState<{ version: string; updatedAt: string } | null>(null)
+  const updateStatus = useUpdateStore()
 
   useEffect(() => {
     window.electron?.system.getUpdateInfo?.().then(setUpdateInfo).catch(() => {})
   }, [])
 
-  const isRecentlyUpdated = updateInfo
-    ? (Date.now() - new Date(updateInfo.updatedAt).getTime()) < 7 * 24 * 60 * 60 * 1000
-    : false
-  const updatedDateLabel = updateInfo
-    ? `${new Date(updateInfo.updatedAt).getMonth() + 1}/${new Date(updateInfo.updatedAt).getDate()}`
-    : ''
+  // 부제 텍스트 + 색상 (업데이트 상태 우선, 없으면 "최신 버전")
+  const subtitle = (() => {
+    switch (updateStatus.status) {
+      case 'downloading':
+        return { text: `업데이트 다운로드 중 ${updateStatus.progress ?? 0}%`, tone: 'progress' as const }
+      case 'ready':
+        return { text: '업데이트 준비됨 — 설치 요청', tone: 'action' as const }
+      case 'error':
+        return { text: '업데이트 오류 — 수동 다운로드', tone: 'error' as const }
+      default:
+        return { text: '최신 버전', tone: 'normal' as const }
+    }
+  })()
+
+  const handleSubtitleClick = () => {
+    if (updateStatus.status === 'ready')      updateStatus.installNow()
+    else if (updateStatus.status === 'error') updateStatus.openManualDownload()
+  }
+  const isClickable = updateStatus.status === 'ready' || updateStatus.status === 'error'
 
   const accessMap: Record<string, boolean> = {
     auto:   canUseAuto,
@@ -116,16 +131,18 @@ export function Sidebar() {
               <span className="text-[10px] font-mono text-slate-500 leading-none">v{updateInfo.version}</span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-1 leading-none">
-            주문매칭
-            {isRecentlyUpdated && (
-              <>
-                <span className="text-slate-600 mx-1">·</span>
-                <span className="text-emerald-400/90 font-medium">{updatedDateLabel} 업데이트됨</span>
-              </>
-            )}
-            {!isRecentlyUpdated && ' 시스템'}
-          </p>
+          <button
+            onClick={handleSubtitleClick}
+            disabled={!isClickable}
+            className={`text-xs mt-1 leading-none transition-colors ${
+              subtitle.tone === 'progress' ? 'text-primary-400 font-medium'
+              : subtitle.tone === 'action'   ? 'text-emerald-400 font-semibold animate-pulse cursor-pointer hover:text-emerald-300'
+              : subtitle.tone === 'error'    ? 'text-amber-400 font-medium cursor-pointer hover:text-amber-300'
+              : 'text-slate-500 cursor-default'
+            }`}
+          >
+            {subtitle.text}
+          </button>
         </div>
       </div>
 

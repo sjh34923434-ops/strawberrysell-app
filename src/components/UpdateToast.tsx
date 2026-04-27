@@ -24,7 +24,7 @@ export function UpdateToast() {
   // 다운로드 중
   if (status === 'downloading') {
     return (
-      <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl border border-primary-500/30 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
+      <div className="fixed bottom-24 right-6 z-50 w-80 rounded-2xl border border-primary-500/30 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <div className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-primary-500/15 border border-primary-500/30 flex items-center justify-center">
             <Download size={14} className="text-primary-400 animate-pulse" />
@@ -58,7 +58,7 @@ export function UpdateToast() {
   // 다운로드 완료 — 설치 대기
   if (status === 'ready') {
     return (
-      <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl border border-emerald-500/40 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
+      <div className="fixed bottom-24 right-6 z-50 w-80 rounded-2xl border border-emerald-500/40 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <div className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
             <CheckCircle2 size={14} className="text-emerald-400" />
@@ -92,7 +92,7 @@ export function UpdateToast() {
   // 에러 발생
   if (status === 'error') {
     return (
-      <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl border border-amber-500/40 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
+      <div className="fixed bottom-24 right-6 z-50 w-80 rounded-2xl border border-amber-500/40 bg-dark-card shadow-2xl shadow-black/50 animate-fade-in overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <div className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
             <AlertCircle size={14} className="text-amber-400" />
