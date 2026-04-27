@@ -15,9 +15,13 @@ contextBridge.exposeInMainWorld('electron', {
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
   },
   updater: {
-    checkForUpdates:   ()                   => ipcRenderer.invoke('check-for-updates'),
-    installUpdate:     ()                   => ipcRenderer.invoke('install-update'),
-    onUpdateAvailable: (cb: () => void)     => ipcRenderer.on('update-available', cb),
-    onUpdateDownloaded:(cb: () => void)     => ipcRenderer.on('update-downloaded', cb),
+    checkForUpdates:    ()                  => ipcRenderer.invoke('check-for-updates'),
+    installUpdate:      ()                  => ipcRenderer.invoke('install-update'),
+    openDownloadPage:   ()                  => ipcRenderer.invoke('open-download-page'),
+    onStatus: (cb: (s: unknown) => void) => {
+      const handler = (_e: unknown, s: unknown) => cb(s)
+      ipcRenderer.on('updater:status', handler)
+      return () => ipcRenderer.removeListener('updater:status', handler)
+    },
   },
 })

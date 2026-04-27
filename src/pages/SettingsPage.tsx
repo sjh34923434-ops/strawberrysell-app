@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown, Monitor, X, Download, Upload, Database } from 'lucide-react'
+import { Key, Shield, User, AlertCircle, CheckCircle2, Loader2, Type, RotateCcw, FolderOpen, Trash2, FileText, LogOut, ChevronDown, Monitor, X, Download, Upload, Database, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useSettingsStore, type FileNameDateFormat } from '../stores/settingsStore'
@@ -313,6 +313,13 @@ export function SettingsPage() {
                 <Monitor size={12} /> 기기 관리
               </h3>
               <DeviceManagementPanel />
+            </div>
+
+            <div className="border-t border-dark-border pt-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <RefreshCw size={12} /> 버전 · 업데이트
+              </h3>
+              <UpdateCheckPanel />
             </div>
 
           </div>
@@ -635,6 +642,75 @@ export function SettingsPage() {
         </div>
 
       </div>
+    </div>
+  )
+}
+
+// ─── 버전 · 업데이트 패널 ─────────────────────────────────────────────────────
+
+function UpdateCheckPanel() {
+  const [info, setInfo] = useState<{ version: string; updatedAt: string } | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [result,   setResult]   = useState<{ type: 'idle' | 'latest' | 'newer' | 'error'; message?: string }>({ type: 'idle' })
+
+  useEffect(() => {
+    window.electron?.system.getUpdateInfo?.().then(setInfo).catch(() => {})
+  }, [])
+
+  const handleCheck = async () => {
+    setChecking(true)
+    setResult({ type: 'idle' })
+    try {
+      const r = await window.electron.updater.checkForUpdates()
+      if (!r.ok) {
+        setResult({ type: 'error', message: r.error })
+      } else if (r.version && info && r.version !== info.version) {
+        setResult({ type: 'newer', message: `v${r.version} 발견 — 백그라운드 다운로드 시작됨` })
+      } else {
+        setResult({ type: 'latest', message: '현재 최신 버전을 사용 중이에요' })
+      }
+    } catch (err) {
+      setResult({ type: 'error', message: err instanceof Error ? err.message : '확인 실패' })
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-300">현재 버전</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {info ? `v${info.version} · ${new Date(info.updatedAt).toLocaleDateString('ko-KR')} 설치` : '확인 중...'}
+          </p>
+        </div>
+        <button
+          onClick={handleCheck}
+          disabled={checking}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500/10 border border-primary-500/30 text-primary-300 hover:bg-primary-500/20 disabled:opacity-50 transition-all"
+        >
+          {checking ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+          {checking ? '확인 중...' : '업데이트 확인'}
+        </button>
+      </div>
+
+      {result.type !== 'idle' && (
+        <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs animate-fade-in ${
+          result.type === 'latest' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+          : result.type === 'newer' ? 'bg-primary-500/10 border-primary-500/20 text-primary-300'
+          : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+        }`}>
+          {result.type === 'latest' ? <CheckCircle2 size={13} className="shrink-0 mt-0.5" />
+            : result.type === 'newer' ? <Download size={13} className="shrink-0 mt-0.5" />
+            : <AlertCircle size={13} className="shrink-0 mt-0.5" />}
+          <span>{result.message}</span>
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-500 leading-relaxed">
+        새 버전 발견 시 자동으로 다운로드되며, 우측 하단에 "지금 설치" 알림이 떠요.
+      </p>
     </div>
   )
 }

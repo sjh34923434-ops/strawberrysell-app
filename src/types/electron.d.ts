@@ -1,3 +1,13 @@
+interface UpdateStatus {
+  status:          'idle' | 'checking' | 'downloading' | 'ready' | 'error'
+  version?:        string
+  progress?:       number
+  bytesPerSecond?: number
+  transferred?:    number
+  total?:          number
+  error?:          string
+}
+
 interface Window {
   electron: {
     store: {
@@ -13,10 +23,10 @@ interface Window {
       getPresetSeed:  () => Promise<string | null>
     }
     updater: {
-      checkForUpdates:    () => Promise<void>
+      checkForUpdates:    () => Promise<{ ok: boolean; version?: string; error?: string }>
       installUpdate:      () => Promise<void>
-      onUpdateAvailable:  (cb: () => void) => void
-      onUpdateDownloaded: (cb: () => void) => void
+      openDownloadPage:   () => Promise<void>
+      onStatus:           (cb: (s: UpdateStatus) => void) => () => void
     }
   }
 }

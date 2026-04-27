@@ -9,7 +9,7 @@ import { usePlanAccess, type PlanTier } from './utils/planAccess'
 
 import { Sidebar }         from './components/Sidebar'
 import { ChatBubble }      from './components/chat/ChatBubble'
-import { UpdateBanner }    from './components/UpdateBanner'
+import { UpdateToast }     from './components/UpdateToast'
 import { LoginPage }       from './pages/LoginPage'
 import { RegisterPage }    from './pages/RegisterPage'
 import { ActivatePage }    from './pages/ActivatePage'
@@ -36,7 +36,7 @@ function PlanGate({ requires, children }: { requires: PlanTier; children: React.
 function AppLayout() {
   return (
     <div className="flex min-h-screen bg-dark-bg dark:bg-dark-bg bg-gray-50">
-      <UpdateBanner />
+      <UpdateToast />
       <Sidebar />
       <main className="flex flex-col flex-1 min-w-0">
         <Routes>
