@@ -140,6 +140,20 @@ export function LoginPage() {
               {isLoading ? '로그인 중...' : '로그인'}
             </button>
           </form>
+
+          {/* 회원가입 안내 */}
+          <div className="mt-5 pt-4 border-t border-dark-border dark:border-dark-border border-gray-200 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-500 text-gray-500">
+              아직 계정이 없으신가요?
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/register')}
+              className="mt-1.5 text-sm font-semibold text-primary-400 hover:text-primary-300 transition-colors"
+            >
+              회원가입 →
+            </button>
+          </div>
         </div>
 
         <p className="text-center text-xs text-slate-600 dark:text-slate-600 text-gray-400 mt-4">

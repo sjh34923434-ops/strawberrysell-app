@@ -131,6 +131,16 @@ export default function App() {
     document.documentElement.style.fontSize = `${fontSize}px`
   }, [fontSize])
 
+  // 로그인 사용자 변경 시 → settingsStore 재로드 (사용자별 데이터 슬롯으로 전환)
+  useEffect(() => {
+    const unsubscribe = useAuthStore.subscribe((state, prev) => {
+      if (state.user?.id !== prev.user?.id) {
+        useSettingsStore.persist.rehydrate()
+      }
+    })
+    return unsubscribe
+  }, [])
+
   useEffect(() => {
     const init = async () => {
       // 1회성 프리셋 마이그레이션 (seed 파일이 있으면 localStorage에 주입)

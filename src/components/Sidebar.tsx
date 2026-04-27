@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock, ExternalLink } from 'lucide-react'
+import { BarChart3, GitMerge, Settings, LogOut, ChevronRight, Layers, HelpCircle, BookOpen, ShieldCheck, Building2, ShoppingCart, Database, Zap, Lock, ExternalLink, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useUpdateStore } from '../stores/updateStore'
 import { usePlanAccess, type PlanTier } from '../utils/planAccess'
@@ -238,7 +238,7 @@ export function Sidebar() {
       <button
         onClick={() => window.open('https://strawberrysell.com', '_blank')}
         className="
-          mx-3 mb-3 flex items-center gap-2.5 px-3 py-2.5 rounded-xl
+          mx-3 mb-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl
           border border-primary-500/25 bg-gradient-to-br from-primary-500/10 to-primary-500/5
           hover:from-primary-500/15 hover:to-primary-500/10 hover:border-primary-500/40
           transition-all duration-150 group
@@ -251,6 +251,27 @@ export function Sidebar() {
           <p className="text-[10px] text-slate-500 mt-1 leading-none truncate">strawberrysell.com</p>
         </div>
         <ExternalLink size={12} className="text-slate-500 group-hover:text-primary-400 shrink-0 transition-colors" />
+      </button>
+
+      {/* 카카오 오픈채팅 바로가기 배너 */}
+      <button
+        onClick={() => window.open('https://open.kakao.com/o/g4FsAbqi', '_blank')}
+        className="
+          mx-3 mb-3 flex items-center gap-2.5 px-3 py-2.5 rounded-xl
+          border border-yellow-400/30 bg-gradient-to-br from-yellow-400/10 to-yellow-500/5
+          hover:from-yellow-400/15 hover:to-yellow-500/10 hover:border-yellow-400/50
+          transition-all duration-150 group
+        "
+        title="딸기셀 카카오 오픈채팅 새 창에서 열기"
+      >
+        <div className="w-7 h-7 shrink-0 rounded-md bg-yellow-300 flex items-center justify-center">
+          <MessageCircle size={15} className="text-yellow-900" fill="currentColor" />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-xs font-semibold text-slate-100 leading-none">카카오 오픈채팅</p>
+          <p className="text-[10px] text-slate-500 mt-1 leading-none truncate">이용자 소통방</p>
+        </div>
+        <ExternalLink size={12} className="text-slate-500 group-hover:text-yellow-400 shrink-0 transition-colors" />
       </button>
 
       {/* 하단 영역 */}

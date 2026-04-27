@@ -251,6 +251,54 @@ export function SettingsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* 새 라이선스 키로 변경 */}
+                <div className="pt-3 border-t border-dark-border dark:border-dark-border border-gray-200">
+                  <p className="text-xs text-slate-400 dark:text-slate-400 text-gray-500 mb-2">새 라이선스 키로 변경</p>
+                  {error && (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 mb-2 animate-fade-in">
+                      <AlertCircle size={13} className="text-red-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-300">{error}</p>
+                    </div>
+                  )}
+                  {activateSuccess && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-2 animate-fade-in">
+                      <CheckCircle2 size={13} className="text-emerald-400" />
+                      <p className="text-xs text-emerald-300">라이선스가 변경되었습니다.</p>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newLicenseKey}
+                      onChange={(e) => setNewLicenseKey(e.target.value)}
+                      placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                      className="
+                        flex-1 px-3 py-2 rounded-xl text-xs font-mono
+                        bg-dark-hover dark:bg-dark-hover bg-gray-50
+                        border border-dark-border dark:border-dark-border border-gray-200
+                        text-slate-200 dark:text-slate-200 text-gray-800
+                        placeholder-slate-600
+                        focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                      "
+                    />
+                    <button
+                      onClick={handleActivate}
+                      disabled={isLoading || !newLicenseKey.trim()}
+                      className="
+                        px-4 py-2 rounded-xl text-xs font-semibold
+                        bg-primary-500 hover:bg-primary-600 text-white
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                        transition-all duration-150 shrink-0
+                        flex items-center gap-1.5
+                      "
+                    >
+                      {isLoading && <Loader2 size={13} className="animate-spin" />}
+                      변경
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1.5">새 키로 변경하면 기존 라이선스는 자동 해제됩니다.</p>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -512,11 +560,25 @@ export function SettingsPage() {
                 <Database size={12} /> 거래처 백업 · 가져오기
               </h3>
           <div className="space-y-3">
-            <p className="text-sm text-slate-400 dark:text-slate-400 text-gray-500">
-              등록한 거래처, 마켓 양식, 송장 매핑 프리셋을 파일로 내보내거나 가져옵니다.
-              <br />
-              <span className="text-xs text-slate-500">다른 PC에서 같은 설정을 사용하려면 내보낸 파일을 복사한 뒤 가져오기 하세요.</span>
-            </p>
+            <div className="text-sm text-slate-400 dark:text-slate-400 text-gray-500 space-y-3">
+              <p>등록한 거래처, 마켓 양식, 송장 매핑 프리셋을 파일로 백업/복원합니다.</p>
+
+              <div className="px-3 py-2.5 rounded-lg border border-primary-500/20 bg-primary-500/5">
+                <p className="text-xs font-semibold text-primary-300 mb-1.5">📤 1단계: 백업 파일 만들기 (먼저 해야 함)</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <span className="text-slate-300 font-medium">[백업 파일 내보내기]</span> 클릭 → 다운로드 폴더에
+                  <code className="mx-1 text-amber-400 font-mono">딸기셀_거래처백업_YYYYMMDD.json</code> 생성됨
+                </p>
+              </div>
+
+              <div className="px-3 py-2.5 rounded-lg border border-slate-600/40 bg-dark-hover/50">
+                <p className="text-xs font-semibold text-slate-300 mb-1.5">📥 2단계: 다른 PC에서 불러오기 (필요할 때만)</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  1단계에서 만든 .json 파일을 USB·이메일·카톡 등으로 새 PC에 옮긴 후 →
+                  <span className="text-slate-300 font-medium ml-1">[백업 파일 가져오기]</span> 클릭 → 옮긴 파일 선택
+                </p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
               <div className="px-3 py-2 rounded-lg bg-dark-hover dark:bg-dark-hover bg-gray-50">

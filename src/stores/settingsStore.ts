@@ -1,17 +1,35 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { useAuthStore } from './authStore'
 
-// electron-store를 Zustand persist storage로 사용
+// 현재 로그인 사용자별로 키를 분리해서 같은 PC라도 계정마다 데이터 격리
+// 비로그인 상태(가입 화면 등)는 'guest'로 처리
+function userKey(baseName: string): string {
+  const uid = useAuthStore.getState().user?.id ?? 'guest'
+  return `${baseName}__${uid}`
+}
+
+// electron-store를 Zustand persist storage로 사용 (사용자별 키 분리)
 const electronStorage = createJSONStorage(() => ({
   getItem: async (name: string): Promise<string | null> => {
-    const value = await window.electron.store.get(name)
+    const key = userKey(name)
+    let value = await window.electron.store.get(key)
+    // 마이그레이션: 사용자별 키가 없는데 기존 단일 키 데이터가 있으면 1회 복사
+    if (value == null && useAuthStore.getState().user?.id) {
+      const legacy = await window.electron.store.get(name)
+      if (legacy != null) {
+        await window.electron.store.set(key, legacy)
+        // legacy는 일단 보존 (다른 계정도 마이그레이션 필요할 수 있음)
+        value = legacy
+      }
+    }
     return (value as string) ?? null
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    await window.electron.store.set(name, value)
+    await window.electron.store.set(userKey(name), value)
   },
   removeItem: async (name: string): Promise<void> => {
-    await window.electron.store.delete(name)
+    await window.electron.store.delete(userKey(name))
   },
 }))
 import type { ColumnMapping } from '../utils/fillMapper'
