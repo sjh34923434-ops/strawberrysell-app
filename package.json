@@ -1,7 +1,7 @@
 {
   "name": "strawberrysell",
   "productName": "딸기셀",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "주문매칭 자동화 프로그램",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -88,12 +88,14 @@
       "installerLanguages": [
         "ko-KR"
       ],
-      "language": "1042"
+      "language": "1042",
+      "artifactName": "strawberry_Setup.exe"
     },
     "publish": {
       "provider": "github",
       "owner": "sjh34923434-ops",
-      "repo": "strawberrysell-app"
+      "repo": "strawberrysell-app",
+      "releaseType": "release"
     }
   }
 }

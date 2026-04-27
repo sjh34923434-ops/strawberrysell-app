@@ -106,7 +106,7 @@ export function Sidebar() {
     ">
       {/* 로고 */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-dark-border dark:border-dark-border border-gray-200">
-        <img src="/icon.svg" alt="딸기셀" className="w-10 h-10 shrink-0 select-none" />
+        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="딸기셀" className="w-10 h-10 shrink-0 select-none" />
         <div className="min-w-0">
           <div className="flex items-baseline gap-1.5">
             <p className="text-sm font-semibold text-slate-100 dark:text-slate-100 text-gray-900 leading-none">
@@ -228,7 +228,7 @@ export function Sidebar() {
         "
         title="딸기셀 웹사이트 새 창에서 열기"
       >
-        <img src="/icon.svg" alt="" className="w-7 h-7 shrink-0" />
+        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="w-7 h-7 shrink-0" />
         <div className="flex-1 text-left min-w-0">
           <p className="text-xs font-semibold text-slate-100 leading-none">딸기셀 웹사이트</p>
           <p className="text-[10px] text-slate-500 mt-1 leading-none truncate">strawberrysell.com</p>
