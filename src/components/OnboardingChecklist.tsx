@@ -68,12 +68,13 @@ export function OnboardingChecklist() {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {allDone && (
-            <button onClick={e => { e.stopPropagation(); handleDismiss() }}
-              className="p-1 text-slate-500 hover:text-slate-300 transition-colors">
-              <X size={14} />
-            </button>
-          )}
+          <button
+            onClick={e => { e.stopPropagation(); handleDismiss() }}
+            title={allDone ? '닫기' : '안내 닫기 (나중에 다시 보지 않음)'}
+            className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <X size={14} />
+          </button>
           <ChevronDown size={15} className={`text-slate-500 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
         </div>
       </div>

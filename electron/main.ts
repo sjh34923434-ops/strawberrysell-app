@@ -5,8 +5,16 @@ import { existsSync, readFileSync, unlinkSync } from 'fs'
 import Store from 'electron-store'
 import { setupUpdater } from './updater'
 
-const store = new Store()
 const isDev = process.env.NODE_ENV === 'development'
+
+// dev 모드는 설치본과 별도의 userData 폴더 사용 (데이터 격리)
+// 설치본: %APPDATA%/딸기셀/
+// dev:    %APPDATA%/딸기셀-dev/
+if (isDev) {
+  app.setPath('userData', join(app.getPath('appData'), '딸기셀-dev'))
+}
+
+const store = new Store()
 
 // ─── MAC 주소 조회 ─────────────────────────────────────────────────────────────
 

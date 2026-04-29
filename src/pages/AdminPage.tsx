@@ -108,7 +108,7 @@ export function AdminPage() {
     if (preset === 'official') {
       setPlan('1month'); setPlanTier('single'); setLabel(''); setIssuedTo(''); setIssueNotes('')
     } else if (preset === 'beta') {
-      setPlan('3month'); setPlanTier('auto'); setLabel('베타테스터'); setIssuedTo(''); setIssueNotes('베타 테스트 참여 - 발급일 + 90일')
+      setPlan('unlimited'); setPlanTier('auto'); setLabel('베타테스터'); setIssuedTo(''); setIssueNotes('현재 베타테스트 진행 중 - 무료 전체 기능 제공')
     } else {
       setPlan('3month'); setPlanTier('auto'); setLabel('협업'); setIssuedTo(''); setIssueNotes('협업 라이선스')
     }
@@ -324,7 +324,7 @@ export function AdminPage() {
                 🎫 정식 발급
               </button>
               <button onClick={() => applyPreset('beta')} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-dark-border hover:border-amber-500/40 hover:bg-amber-500/5 text-slate-300 transition-all">
-                🧪 베타 키 (3개월 무료·전체)
+                🧪 베타 키 (베타 기간 무료·전체)
               </button>
               <button onClick={() => applyPreset('partner')} className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-dark-border hover:border-purple-500/40 hover:bg-purple-500/5 text-slate-300 transition-all">
                 🤝 협업 키 (3개월 무료·전체)
