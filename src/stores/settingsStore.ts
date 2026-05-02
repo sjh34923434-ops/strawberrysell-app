@@ -151,6 +151,8 @@ interface SettingsState {
   saveCoupangPartner:        (data: Omit<CoupangPartner, 'id' | 'createdAt'>) => void
   updateCoupangPartner:      (id: string, data: Partial<Omit<CoupangPartner, 'id' | 'createdAt'>>) => void
   deleteCoupangPartner:      (id: string) => void
+  moveCoupangPartner:        (id: string, direction: 'up' | 'down') => void
+  reorderCoupangPartners:    (orderedIds: string[]) => void
   savePerMarketMapping:      (partnerId: string, mapping: PerMarketMapping) => void
   deletePerMarketMapping:    (partnerId: string, marketType: MarketType) => void
 
@@ -233,6 +235,26 @@ export const useSettingsStore = create<SettingsState>()(
 
       deleteCoupangPartner: (id) =>
         set({ coupangPartners: get().coupangPartners.filter((p) => p.id !== id) }),
+
+      moveCoupangPartner: (id, direction) => {
+        const list = [...get().coupangPartners]
+        const idx = list.findIndex(p => p.id === id)
+        if (idx === -1) return
+        const target = direction === 'up' ? idx - 1 : idx + 1
+        if (target < 0 || target >= list.length) return
+        const [item] = list.splice(idx, 1)
+        list.splice(target, 0, item)
+        set({ coupangPartners: list })
+      },
+
+      reorderCoupangPartners: (orderedIds) => {
+        const map = new Map(get().coupangPartners.map(p => [p.id, p]))
+        const reordered = orderedIds.map(id => map.get(id)).filter((p): p is CoupangPartner => !!p)
+        // 누락된 파트너가 있으면 끝에 붙임 (안전장치)
+        const seen = new Set(orderedIds)
+        const missing = get().coupangPartners.filter(p => !seen.has(p.id))
+        set({ coupangPartners: [...reordered, ...missing] })
+      },
 
       savePerMarketMapping: (partnerId, pm) =>
         set({

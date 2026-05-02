@@ -3,8 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Database, Plus, Pencil, Trash2, Tag, X,
   CheckCircle2, FileSpreadsheet, AlertCircle, Store, Truck, Zap,
-  ChevronDown, ChevronUp, Monitor, ArrowLeft,
+  ChevronDown, ChevronUp, Monitor, ArrowLeft, ArrowUp, ArrowDown, GripVertical,
 } from 'lucide-react'
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useSettingsStore, type CoupangPartner, type MarketTemplate, type SupplierMappingPreset, type MarketType, MARKET_TYPES } from '../stores/settingsStore'
 import { FileUploader } from '../components/FileUploader'
 import { ColumnMapper } from '../components/ColumnMapper'
@@ -74,14 +78,67 @@ const emptyForm = (): FormState => ({
 // ─── 공통 파트너 카드 ──────────────────────────────────────────────────────────
 
 function PartnerCard({
-  prefix, name, fileName, mappingCount, hasFile,
-  onEdit, onDelete,
+  id, prefix, name, fileName, mappingCount, hasFile,
+  onEdit, onDelete, onMoveUp, onMoveDown, isFirst, isLast,
+  sortable = false,
 }: {
-  prefix?: string; name: string; fileName?: string; mappingCount: number; hasFile: boolean
+  id?: string; prefix?: string; name: string; fileName?: string; mappingCount: number; hasFile: boolean
   onEdit: () => void; onDelete: () => void
+  onMoveUp?: () => void; onMoveDown?: () => void
+  isFirst?: boolean; isLast?: boolean
+  sortable?: boolean
 }) {
+  // sortable이 true이고 id가 있을 때만 드래그 활성화
+  const sortableState = useSortable({ id: id ?? '__nope__', disabled: !sortable || !id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortableState
+  const style = sortable ? { transform: CSS.Transform.toString(transform), transition } : undefined
+
+  const showMoveButtons = !!onMoveUp || !!onMoveDown
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-dark-border bg-dark-card hover:border-primary-500/30 transition-all group">
+    <div
+      ref={sortable ? setNodeRef : undefined}
+      style={style}
+      className={`flex items-center gap-3 px-3 py-2 rounded-xl border bg-dark-card transition-all group ${
+        isDragging
+          ? 'border-primary-500/60 opacity-70 shadow-2xl scale-[1.01] z-10'
+          : 'border-dark-border hover:border-primary-500/30'
+      }`}
+    >
+      {/* 드래그 핸들 (sortable 모드에서만) */}
+      {sortable && (
+        <button
+          {...attributes}
+          {...listeners}
+          title="끌어서 순서 변경"
+          tabIndex={-1}
+          className="shrink-0 p-1 rounded-md text-slate-500 hover:text-primary-400 hover:bg-primary-500/10 cursor-grab active:cursor-grabbing touch-none transition-colors"
+        >
+          <GripVertical size={14} />
+        </button>
+      )}
+
+      {/* 순서 변경 버튼 (항상 노출 - 키보드/터치 보조) */}
+      {showMoveButtons && (
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <button
+            onClick={onMoveUp}
+            disabled={isFirst}
+            title="위로 이동"
+            className="p-1 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 hover:border-sky-400/60 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+          >
+            <ArrowUp size={12} />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={isLast}
+            title="아래로 이동"
+            className="p-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 hover:border-amber-400/60 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+          >
+            <ArrowDown size={12} />
+          </button>
+        </div>
+      )}
+
       <div className="w-9 h-9 rounded-lg bg-primary-500/10 border border-primary-500/20 flex flex-col items-center justify-center shrink-0 gap-0">
         {prefix ? (
           <>
@@ -131,7 +188,7 @@ function PartnerCard({
 
 export function B2bPartnersPage() {
   const {
-    coupangPartners, saveCoupangPartner, updateCoupangPartner, deleteCoupangPartner, savePerMarketMapping, deletePerMarketMapping,
+    coupangPartners, saveCoupangPartner, updateCoupangPartner, deleteCoupangPartner, moveCoupangPartner, reorderCoupangPartners, savePerMarketMapping, deletePerMarketMapping,
     marketTemplates, saveMarketTemplate, updateMarketTemplate, deleteMarketTemplate,
     supplierMappingPresets, saveSupplierMappingPreset, updateSupplierMappingPreset, deleteSupplierMappingPreset,
   } = useSettingsStore()
@@ -157,6 +214,18 @@ export function B2bPartnersPage() {
   }, [tab, showSupplierTab])
 
   const isB2b = tab === 'b2b'
+
+  // ── 거래처 드래그 정렬 ──
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const handlePartnerDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const ids = coupangPartners.map(p => p.id)
+    const oldIndex = ids.indexOf(String(active.id))
+    const newIndex = ids.indexOf(String(over.id))
+    if (oldIndex < 0 || newIndex < 0) return
+    reorderCoupangPartners(arrayMove(ids, oldIndex, newIndex))
+  }
 
   // ── supplier 탭 핸들러 ──
   const openAddSupplier = () => { setSEditingId(null); setSForm(emptySupplierForm()); setSFormOpen(true) }
@@ -697,15 +766,26 @@ export function B2bPartnersPage() {
                 />
               ) : (
                 <>
-                  {coupangPartners.map(p => (
-                    <PartnerCard
-                      key={p.id} prefix={p.prefix} name={p.partnerName}
-                      fileName={p.b2bFileName} mappingCount={Object.values(p.mapping).filter(Boolean).length}
-                      hasFile={p.b2bHeaders.length > 0}
-                      onEdit={() => openEditB2b(p)}
-                      onDelete={() => deleteCoupangPartner(p.id)}
-                    />
-                  ))}
+                  <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handlePartnerDragEnd}>
+                    <SortableContext items={coupangPartners.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {coupangPartners.map((p, idx) => (
+                          <PartnerCard
+                            key={p.id} id={p.id} sortable
+                            prefix={p.prefix} name={p.partnerName}
+                            fileName={p.b2bFileName} mappingCount={Object.values(p.mapping).filter(Boolean).length}
+                            hasFile={p.b2bHeaders.length > 0}
+                            onEdit={() => openEditB2b(p)}
+                            onDelete={() => deleteCoupangPartner(p.id)}
+                            onMoveUp={() => moveCoupangPartner(p.id, 'up')}
+                            onMoveDown={() => moveCoupangPartner(p.id, 'down')}
+                            isFirst={idx === 0}
+                            isLast={idx === coupangPartners.length - 1}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                   <AddMoreButton label="거래처 추가" onClick={openAdd} />
                 </>
               )
