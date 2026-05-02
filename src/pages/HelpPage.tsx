@@ -850,14 +850,14 @@ function PlanLicenseSection() {
       desc: '주문 엑셀 ↔ B2B 양식 수동 매칭 (가입 후 30일 무료 체험)',
     },
     {
-      name: '일괄매칭', price: '월 15,000원',
+      name: '일괄매칭', price: '월 20,000원',
       tier: 'bulk', devices: 2,
       color: 'border-slate-700 bg-slate-800/40',
       badge: 'text-slate-300 bg-slate-700/40',
       desc: '여러 거래처 섞인 주문 파일 한 번에 분류·처리 (+ 1:1 주문매칭 포함)',
     },
     {
-      name: '자동매칭', price: '월 22,000원',
+      name: '자동매칭', price: '월 30,000원',
       tier: 'auto', devices: 3,
       color: 'border-primary-500/30 bg-primary-500/5',
       badge: 'text-primary-300 bg-primary-500/15',
@@ -871,7 +871,7 @@ function PlanLicenseSection() {
 
         <p className="text-xs text-slate-400">
           상위 플랜을 구매하면 하위 플랜 기능이 모두 포함됩니다. 표시 가격은 부가세 별도(VAT 10%)이며,
-          결제 시 실결제 금액은 1:1 11,000원 / 일괄 16,500원 / 자동 24,200원입니다.
+          결제 시 실결제 금액은 1:1 11,000원 / 일괄 22,000원 / 자동 33,000원입니다.
         </p>
 
         {/* 플랜 카드 3개 */}
