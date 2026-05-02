@@ -73,15 +73,26 @@ export function setupUpdater(win: BrowserWindow): void {
     shell.openExternal(RELEASES_URL)
   })
 
-  // 앱 시작 5초 후 자동 확인
-  setTimeout(() => {
+  // 중복 호출 방지 (마지막 체크 후 60초 안엔 다시 안 함)
+  let lastCheckAt = 0
+  const safeCheck = () => {
+    const now = Date.now()
+    if (now - lastCheckAt < 60_000) return
+    lastCheckAt = now
     autoUpdater.checkForUpdates().catch((err) => {
       console.error('[업데이터] 확인 실패:', err.message)
     })
-  }, 5_000)
+  }
 
-  // 6시간마다 재확인 (장시간 켜놓는 사용자 대응)
-  setInterval(() => {
-    autoUpdater.checkForUpdates().catch(() => {})
-  }, 6 * 60 * 60 * 1000)
+  // ① 앱 시작 2초 후 첫 자동 확인
+  setTimeout(safeCheck, 2_000)
+
+  // ② 1시간마다 재확인 (안전장치)
+  setInterval(safeCheck, 60 * 60 * 1000)
+
+  // ③ 창 포커스 받을 때마다 확인 (사용자가 다른 창 보다 돌아올 때 즉시 감지)
+  win.on('focus', safeCheck)
+
+  // ④ 창 다시 보이게 될 때 (트레이에서 복원 등)
+  win.on('show', safeCheck)
 }

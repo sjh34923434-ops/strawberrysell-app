@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
@@ -6,21 +6,57 @@ import { useAuthStore } from '../stores/authStore'
 const STORAGE_EMAIL    = 'login_saved_email'
 const STORAGE_PASSWORD = 'login_saved_password'
 
+// electron-store 우선, 없으면 localStorage 폴백 (웹 환경 호환)
+async function loadSaved(key: string): Promise<string> {
+  try {
+    if (window.electron?.store) {
+      const v = await window.electron.store.get(key)
+      if (typeof v === 'string') return v
+    }
+  } catch { /* ignore */ }
+  return localStorage.getItem(key) ?? ''
+}
+
+async function saveLogin(email: string, password: string) {
+  try {
+    if (window.electron?.store) {
+      await window.electron.store.set(STORAGE_EMAIL, email)
+      await window.electron.store.set(STORAGE_PASSWORD, password)
+    }
+  } catch { /* ignore */ }
+  // localStorage에도 백업 저장 (호환성)
+  try {
+    localStorage.setItem(STORAGE_EMAIL,    email)
+    localStorage.setItem(STORAGE_PASSWORD, password)
+  } catch { /* ignore */ }
+}
+
 export function LoginPage() {
   const navigate            = useNavigate()
   const { login, isLoading, error, clearError } = useAuthStore()
 
-  const [email,    setEmail]    = useState(() => localStorage.getItem(STORAGE_EMAIL)    ?? '')
-  const [password, setPassword] = useState(() => localStorage.getItem(STORAGE_PASSWORD) ?? '')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
   const [showPw,   setShowPw]   = useState(false)
+
+  // 마운트 시 electron-store에서 저장된 값 로드 (비동기)
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([loadSaved(STORAGE_EMAIL), loadSaved(STORAGE_PASSWORD)])
+      .then(([e, p]) => {
+        if (cancelled) return
+        if (e) setEmail(e)
+        if (p) setPassword(p)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearError()
     try {
       await login(email, password)
-      localStorage.setItem(STORAGE_EMAIL,    email)
-      localStorage.setItem(STORAGE_PASSWORD, password)
+      await saveLogin(email, password)
       navigate('/dashboard')
     } catch {
       // 오류는 store의 error 필드에 표시

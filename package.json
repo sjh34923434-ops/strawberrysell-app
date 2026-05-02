@@ -1,7 +1,7 @@
 {
   "name": "strawberrysell",
   "productName": "딸기셀",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "주문매칭 자동화 프로그램",
   "main": "dist-electron/main.js",
   "scripts": {
