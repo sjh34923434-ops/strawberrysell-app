@@ -10,6 +10,7 @@ import { AddBusinessModal } from '../components/businesses/AddBusinessModal'
 import { AddConnectionModal } from '../components/businesses/AddConnectionModal'
 import { MarketplaceBadge } from '../components/businesses/MarketplaceBadge'
 import { CoupangOpenapiGuide } from '../components/CoupangOpenapiGuide'
+import { SmartstoreApiGuide } from '../components/SmartstoreApiGuide'
 import { api } from '../api/client'
 
 type TestStatus = 'idle' | 'testing' | 'ok' | 'fail'
@@ -162,6 +163,11 @@ function SortableConnCard({
                 />
               </div>
             </>
+          )}
+          {conn.marketplace === 'smartstore' && (
+            <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-3">
+              <SmartstoreApiGuide />
+            </div>
           )}
           <div>
             <label className="block text-xs text-slate-500 mb-1">
